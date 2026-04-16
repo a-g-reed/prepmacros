@@ -12,26 +12,77 @@ body{margin:0;font-family:-apple-system,sans-serif;background:#f5efe6;color:#3d2
 <div id="app">Loading...</div>
 <script>
 window.onerror=function(msg,src,line,col,err){
-  document.getElementById('app').innerHTML='<pre style="color:red;font-size:12px;white-space:pre-wrap">'+msg+'\nLine:'+line+'\n'+(err?err.stack:'')+'</pre>';
+  document.getElementById('app').innerHTML='<pre style="color:red;font-size:11px;white-space:pre-wrap">ERROR:\n'+msg+'\nLine:'+line+'\n'+(err?err.stack:'')+'</pre>';
   return true;
 };
 
-var SB_URL='https://zbeuowizrnkotijtzoeh.supabase.co';
-var SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpiZXVvd2l6cm5rb3RpanR6b2VoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyODM4MDIsImV4cCI6MjA5MTg1OTgwMn0.c8_qca_JiWE0GAnuHW5RMtGgER7ywGO6rHifcCg1frI';
+var CATS=['All','Protein','Carbs','Veg','Snack','Dessert','Creami Base','Other'];
+var DEFAULTS={lowStockThreshold:3,expiryDays:5,forgottenDays:14};
+var S={items:[],history:[],settings:{lowStockThreshold:3,expiryDays:5,forgottenDays:14},dismissedAlerts:{},view:'stock',filterCat:'All',expandedId:null,modal:null,logPortions:1,restockPortions:'',wastePortions:1,editForm:null,syncStatus:'synced',syncMsg:'Saved to cloud',form:{name:'',category:'Protein',portions:'',expiryDays:'',cal:'',protein:'',carbs:'',fat:'',notes:''}};
 
-document.getElementById('app').innerHTML='<p>Testing innerHTML size...</p>';
+function objAssign(t,s){for(var k in s){if(s.hasOwnProperty(k))t[k]=s[k];}return t;}
+function daysSince(d){if(!d)return null;return Math.floor((Date.now()-new Date(d))/86400000);}
+function daysAgo(d){var n=daysSince(d);if(n===null)return null;if(n===0)return'today';if(n===1)return'yesterday';return n+'d ago';}
+function todayStr(){return new Date().toISOString().split('T')[0];}
+function barColor(p){return p>0.5?'#7a9e7e':p>0.25?'#c4a84b':'#b85c38';}
+function isDismissedToday(key){return S.dismissedAlerts[key]===todayStr();}
+function totP(){return S.items.reduce(function(s,it){return s+it.portions;},0);}
+function lowC(){return S.items.filter(function(it){return it.portions>0&&it.portions<=S.settings.lowStockThreshold;}).length;}
+function outC(){return S.items.filter(function(it){return it.portions===0;}).length;}
 
-var bigHTML = '';
-for(var i=0;i<500;i++){
-  bigHTML += '<div style="padding:10px;margin:4px;background:#fff8f0;border-radius:8px;border:1px solid #e0d0ba"><strong>Item '+i+'</strong><p>Some content here with a bit of text to make it realistic</p></div>';
+document.getElementById('app').innerHTML='<p>Functions defined ok, trying renderHeader...</p>';
+
+function renderHeader(){
+  var h='<div style="background:#3d2b1a;padding:12px 20px 10px;">';
+  h+='<div style="display:flex;justify-content:space-between;align-items:center;">';
+  h+='<div style="font-size:20px;color:#f0d9b5;">PrepMacros</div>';
+  h+='<div style="color:#c8a96e;font-size:14px;">'+totP()+' portions</div>';
+  h+='</div>';
+  h+='<div style="display:flex;gap:5px;padding:8px 0 10px;">';
+  var views=[['stock','Stock'],['add','Add'],['log','Log'],['history','Hist'],['settings','Settings']];
+  for(var i=0;i<views.length;i++){
+    var v=views[i];
+    h+='<button onclick="S.view=\''+v[0]+'\';doRender();" style="flex:1;padding:7px 2px;border-radius:8px;border:none;font-size:11px;cursor:pointer;background:'+(S.view===v[0]?'#c8a96e':'rgba(255,255,255,0.1)')+';color:'+(S.view===v[0]?'#3d2b1a':'#d4c4a8')+';">'+v[1]+'</button>';
+  }
+  h+='</div></div>';
+  return h;
 }
 
-try {
-  document.getElementById('app').innerHTML = bigHTML;
-  document.getElementById('app').innerHTML = '<p style="color:green">Large innerHTML worked fine! '+bigHTML.length+' chars</p>';
-} catch(e) {
-  document.getElementById('app').innerHTML = '<p style="color:red">innerHTML failed: '+e.message+'</p>';
+document.getElementById('app').innerHTML='<p>renderHeader defined, trying renderStock...</p>';
+
+function renderStock(){
+  var h='<div style="padding:16px;">';
+  h+='<div style="font-size:22px;font-weight:700;margin-bottom:16px;">Your Stock</div>';
+  if(!S.items.length){
+    h+='<div style="text-align:center;padding:48px 20px;color:#a08060;">';
+    h+='<div style="font-size:40px;margin-bottom:12px;">🥡</div>';
+    h+='<div style="font-size:18px;margin-bottom:6px;">No items yet</div>';
+    h+='<div style="font-size:13px;">Tap Add to log your first prep batch</div>';
+    h+='</div>';
+  } else {
+    S.items.forEach(function(it){
+      h+='<div style="background:#fff8f0;border-radius:14px;border:1px solid #e0d0ba;padding:14px;margin-bottom:10px;">';
+      h+='<div style="font-weight:700;">'+it.name+'</div>';
+      h+='<div style="color:#a08060;font-size:12px;">'+it.portions+' portions</div>';
+      h+='</div>';
+    });
+  }
+  h+='</div>';
+  return h;
 }
+
+document.getElementById('app').innerHTML='<p>renderStock defined, calling doRender...</p>';
+
+function doRender(){
+  try{
+    var h=renderHeader()+renderStock();
+    document.getElementById('app').innerHTML=h;
+  }catch(e){
+    document.getElementById('app').innerHTML='<pre style="color:red;font-size:11px">doRender error: '+e.message+'</pre>';
+  }
+}
+
+doRender();
 </script>
 </body>
 </html>
