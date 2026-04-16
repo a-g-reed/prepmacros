@@ -21,272 +21,252 @@
     }
     html, body { height: 100%; background: var(--cream); font-family: 'Lato', sans-serif; color: var(--brown-dark); -webkit-font-smoothing: antialiased; overscroll-behavior: none; }
     #app { height: 100%; display: flex; flex-direction: column; }
-
-```
-/* SYNC STATUS BAR */
-.sync-bar { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 4px 12px; font-size: 11px; font-family: 'Lato', sans-serif; transition: all 0.3s; }
-.sync-bar.syncing { background: rgba(200,169,110,0.2); color: #c8a96e; }
-.sync-bar.synced { background: rgba(122,158,126,0.15); color: #7a9e7e; }
-.sync-bar.error { background: rgba(184,92,56,0.15); color: #b85c38; }
-.sync-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
-.sync-bar.syncing .sync-dot { background: #c8a96e; animation: pulse 1s infinite; }
-.sync-bar.synced .sync-dot { background: #7a9e7e; }
-.sync-bar.error .sync-dot { background: #b85c38; }
-@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
-
-.header { background: var(--brown-dark); padding: max(env(safe-area-inset-top), 12px) 20px 0; position: sticky; top: 0; z-index: 100; flex-shrink: 0; }
-.header-top { display: flex; justify-content: space-between; align-items: center; padding-bottom: 10px; }
-.header-title { font-family: 'Playfair Display', serif; font-size: 20px; color: var(--gold-light); }
-.header-sub { font-size: 10px; color: var(--gold); letter-spacing: 1.5px; text-transform: uppercase; margin-top: 1px; }
-.stat-pills { display: flex; gap: 6px; }
-.stat-pill { background: rgba(255,255,255,0.1); border-radius: 20px; padding: 4px 10px; text-align: center; }
-.stat-pill-val { font-size: 14px; font-weight: 700; }
-.stat-pill-lbl { font-size: 9px; color: #c8b89a; text-transform: uppercase; letter-spacing: 0.5px; }
-.today-strip { background: rgba(200,169,110,0.15); border-top: 1px solid rgba(200,169,110,0.2); padding: 8px 20px; display: flex; gap: 20px; overflow-x: auto; scrollbar-width: none; }
-.today-strip::-webkit-scrollbar { display: none; }
-.today-macro { text-align: center; flex-shrink: 0; }
-.today-macro-val { font-size: 15px; font-weight: 700; color: var(--gold-light); }
-.today-macro-lbl { font-size: 9px; color: #c8b89a; text-transform: uppercase; letter-spacing: 0.5px; }
-.today-label { font-size: 11px; color: #c8b89a; align-self: center; flex-shrink: 0; letter-spacing: 0.5px; text-transform: uppercase; border-right: 1px solid rgba(200,169,110,0.3); padding-right: 16px; margin-right: -4px; }
-.alerts-banner { background: #fdf6e3; border-top: 1px solid rgba(200,160,60,0.25); padding: 6px 16px; }
-.alert-row { display: flex; align-items: center; padding: 6px 0; border-bottom: 1px solid rgba(0,0,0,0.05); }
-.alert-row:last-child { border-bottom: none; }
-.alert-text { font-size: 13px; color: #5a4010; flex: 1; }
-.alert-badge { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 10px; margin-left: 8px; white-space: nowrap; flex-shrink: 0; }
-.alert-dismiss { background: none; border: none; font-size: 15px; color: #b09050; cursor: pointer; padding: 0 2px 0 8px; flex-shrink: 0; }
-.nav { display: flex; gap: 5px; padding: 8px 0 10px; }
-.nav-btn { flex: 1; padding: 7px 2px; border-radius: 8px; border: none; font-family: 'Lato', sans-serif; font-size: 11px; cursor: pointer; transition: all 0.15s; background: rgba(255,255,255,0.08); color: #d4c4a8; }
-.nav-btn.active { background: var(--gold); color: var(--brown-dark); font-weight: 700; }
-.main { flex: 1; overflow-y: auto; padding: 16px 16px calc(env(safe-area-inset-bottom) + 20px); -webkit-overflow-scrolling: touch; }
-.filter-row { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 14px; scrollbar-width: none; }
-.filter-row::-webkit-scrollbar { display: none; }
-.filter-btn { padding: 5px 14px; border-radius: 20px; white-space: nowrap; cursor: pointer; font-family: 'Lato', sans-serif; font-size: 12px; border: 1px solid var(--border-light); background: transparent; color: var(--brown-mid); }
-.filter-btn.active { background: var(--brown-dark); color: var(--gold-light); border-color: var(--brown-dark); }
-.item-card { background: var(--cream-card); border-radius: 14px; border: 1px solid var(--border); overflow: hidden; margin-bottom: 10px; }
-.item-card.card-expired { border-color: var(--red); border-width: 1.5px; }
-.item-card.card-warn { border-color: var(--amber); border-width: 1.5px; }
-.item-card-header { padding: 14px 16px; cursor: pointer; }
-.item-card-row { display: flex; justify-content: space-between; align-items: flex-start; }
-.item-name { font-weight: 700; font-size: 16px; }
-.item-meta { font-size: 11px; color: var(--brown-light); margin-top: 4px; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
-.item-tag { border-radius: 10px; padding: 2px 8px; }
-.tag-default { background: var(--cream-tag); color: var(--brown-mid); }
-.tag-warn { background: #fff0cc; color: #8a6010; }
-.tag-danger { background: #ffe8e0; color: #8a2010; }
-.tag-forgotten { background: #ece8f8; color: #6050a0; }
-.item-portions { text-align: right; flex-shrink: 0; margin-left: 10px; }
-.item-portions-num { font-size: 24px; font-weight: 700; line-height: 1; }
-.item-portions-lbl { font-size: 10px; color: var(--brown-light); }
-.progress-track { background: var(--border-light); border-radius: 4px; height: 5px; margin-top: 10px; }
-.progress-bar { height: 100%; border-radius: 4px; transition: width 0.3s; }
-.item-details { padding: 0 16px 14px; border-top: 1px solid var(--cream-tag); }
-.macro-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 6px; margin: 12px 0; }
-.macro-cell { background: var(--cream-tag); border-radius: 8px; padding: 6px 4px; text-align: center; }
-.macro-val { font-size: 13px; font-weight: 700; }
-.macro-lbl { font-size: 10px; color: var(--brown-light); }
-.item-notes { font-size: 12px; color: var(--brown-mid); margin-bottom: 10px; font-style: italic; }
-.expiry-line { font-size: 12px; color: var(--brown-light); margin-bottom: 10px; }
-.action-row { display: flex; gap: 8px; }
-.btn-primary { background: var(--brown-dark); color: var(--gold-light); border: none; border-radius: 10px; padding: 12px 20px; font-size: 14px; font-weight: 700; cursor: pointer; font-family: 'Lato', sans-serif; }
-.btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
-.btn-secondary { background: transparent; color: var(--brown-dark); border: 1px solid #c8b89a; border-radius: 10px; padding: 12px 20px; font-size: 14px; cursor: pointer; font-family: 'Lato', sans-serif; }
-.btn-danger { color: var(--red) !important; border-color: var(--red) !important; }
-.btn-full { width: 100%; }
-.btn-flex { flex: 1; }
-.btn-sm { padding: 8px 14px; font-size: 13px; }
-.form-label { display: block; font-size: 11px; color: var(--brown-mid); margin-bottom: 4px; margin-top: 14px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; }
-.form-input { width: 100%; padding: 11px 14px; border-radius: 10px; border: 1px solid #d4c4a8; background: var(--cream-card); font-size: 15px; color: var(--brown-dark); font-family: 'Lato', sans-serif; outline: none; -webkit-appearance: none; }
-.form-input:focus { border-color: var(--gold); }
-.form-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.section-heading { font-family: 'Playfair Display', serif; font-size: 15px; margin: 18px 0 2px; color: #5a3e2a; }
-.page-title { font-family: 'Playfair Display', serif; font-size: 22px; margin-bottom: 6px; }
-.page-sub { color: var(--brown-mid); font-size: 13px; margin-bottom: 20px; }
-.log-btn { background: var(--cream-card); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; width: 100%; text-align: left; cursor: pointer; display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-family: 'Lato', sans-serif; }
-.log-btn.forgotten-item { border-color: #9080c0; }
-.log-btn-name { font-weight: 700; font-size: 15px; color: var(--brown-dark); }
-.log-btn-meta { font-size: 12px; color: var(--brown-mid); margin-top: 2px; }
-.log-btn-badge { background: var(--brown-dark); color: var(--gold-light); border-radius: 20px; padding: 4px 14px; font-size: 14px; font-weight: 700; flex-shrink: 0; }
-.history-day-header { display: flex; justify-content: space-between; align-items: baseline; margin: 16px 0 4px; }
-.history-day-label { font-size: 11px; font-weight: 700; color: var(--brown-mid); text-transform: uppercase; letter-spacing: 0.8px; }
-.history-day-macros { font-size: 11px; color: var(--brown-light); }
-.history-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border-light); }
-.history-row:last-child { border-bottom: none; }
-.history-icon { font-size: 18px; width: 26px; text-align: center; flex-shrink: 0; }
-.history-name { font-size: 14px; font-weight: 700; }
-.history-meta { font-size: 12px; color: var(--brown-mid); }
-.settings-block { margin-bottom: 24px; }
-.settings-block-title { font-family: 'Playfair Display', serif; font-size: 17px; margin-bottom: 2px; }
-.settings-block-sub { font-size: 12px; color: var(--brown-light); margin-bottom: 12px; }
-.settings-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--border-light); }
-.settings-row:last-child { border-bottom: none; }
-.settings-label { font-size: 14px; }
-.settings-sublabel { font-size: 12px; color: var(--brown-light); margin-top: 2px; }
-.settings-input { width: 72px; padding: 7px 10px; border-radius: 8px; border: 1px solid #d4c4a8; background: var(--cream-card); font-size: 14px; color: var(--brown-dark); font-family: 'Lato', sans-serif; outline: none; text-align: center; -webkit-appearance: none; }
-.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 200; display: flex; align-items: flex-end; animation: fadeIn 0.15s ease; }
-.modal-sheet { background: var(--cream-card); border-radius: 20px 20px 0 0; padding: 24px 24px calc(env(safe-area-inset-bottom) + 24px); width: 100%; animation: slideUp 0.2s ease; }
-.modal-title { font-family: 'Playfair Display', serif; font-size: 18px; margin-bottom: 4px; }
-.modal-sub { color: var(--brown-mid); font-size: 13px; margin-bottom: 16px; }
-.stepper { display: flex; align-items: center; gap: 20px; }
-.stepper-btn { width: 44px; height: 44px; border-radius: 10px; border: 1px solid #c8b89a; background: transparent; font-size: 22px; cursor: pointer; font-family: 'Lato', sans-serif; flex-shrink: 0; }
-.stepper-val { font-size: 28px; font-weight: 700; min-width: 40px; text-align: center; }
-.macro-preview { background: var(--cream-tag); border-radius: 8px; padding: 10px 14px; margin-top: 14px; font-size: 13px; color: #5a3e2a; line-height: 1.6; }
-.empty-state { text-align: center; padding: 48px 20px; color: var(--brown-light); }
-.empty-icon { font-size: 40px; margin-bottom: 12px; }
-.empty-title { font-family: 'Playfair Display', serif; font-size: 18px; margin-bottom: 6px; color: var(--brown-mid); }
-.empty-sub { font-size: 13px; }
-.loading-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 16px; background: var(--cream); }
-.loading-title { font-family: 'Playfair Display', serif; font-size: 22px; color: var(--brown-dark); }
-.loading-sub { font-size: 13px; color: var(--brown-light); }
-.spinner { width: 32px; height: 32px; border: 3px solid var(--border); border-top-color: var(--gold); border-radius: 50%; animation: spin 0.8s linear infinite; }
-@keyframes spin { to { transform: rotate(360deg); } }
-@keyframes fadeIn { from { opacity:0 } to { opacity:1 } }
-@keyframes slideUp { from { transform:translateY(30px);opacity:0 } to { transform:translateY(0);opacity:1 } }
-button { -webkit-tap-highlight-color: transparent; }
-```
-
+    .sync-bar { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 4px 12px; font-size: 11px; font-family: 'Lato', sans-serif; transition: all 0.3s; min-height: 24px; }
+    .sync-bar.syncing { background: rgba(200,169,110,0.2); color: #c8a96e; }
+    .sync-bar.synced { background: rgba(122,158,126,0.15); color: #7a9e7e; }
+    .sync-bar.error { background: rgba(184,92,56,0.15); color: #b85c38; }
+    .sync-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+    .sync-bar.syncing .sync-dot { background: #c8a96e; animation: pulse 1s infinite; }
+    .sync-bar.synced .sync-dot { background: #7a9e7e; }
+    .sync-bar.error .sync-dot { background: #b85c38; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+    .header { background: var(--brown-dark); padding: max(env(safe-area-inset-top), 12px) 20px 0; position: sticky; top: 0; z-index: 100; flex-shrink: 0; }
+    .header-top { display: flex; justify-content: space-between; align-items: center; padding-bottom: 10px; }
+    .header-title { font-family: 'Playfair Display', serif; font-size: 20px; color: var(--gold-light); }
+    .header-sub { font-size: 10px; color: var(--gold); letter-spacing: 1.5px; text-transform: uppercase; margin-top: 1px; }
+    .stat-pills { display: flex; gap: 6px; }
+    .stat-pill { background: rgba(255,255,255,0.1); border-radius: 20px; padding: 4px 10px; text-align: center; }
+    .stat-pill-val { font-size: 14px; font-weight: 700; }
+    .stat-pill-lbl { font-size: 9px; color: #c8b89a; text-transform: uppercase; letter-spacing: 0.5px; }
+    .today-strip { background: rgba(200,169,110,0.15); border-top: 1px solid rgba(200,169,110,0.2); padding: 8px 20px; display: flex; gap: 20px; overflow-x: auto; scrollbar-width: none; }
+    .today-strip::-webkit-scrollbar { display: none; }
+    .today-macro { text-align: center; flex-shrink: 0; }
+    .today-macro-val { font-size: 15px; font-weight: 700; color: var(--gold-light); }
+    .today-macro-lbl { font-size: 9px; color: #c8b89a; text-transform: uppercase; letter-spacing: 0.5px; }
+    .today-label { font-size: 11px; color: #c8b89a; align-self: center; flex-shrink: 0; letter-spacing: 0.5px; text-transform: uppercase; border-right: 1px solid rgba(200,169,110,0.3); padding-right: 16px; margin-right: -4px; }
+    .alerts-banner { background: #fdf6e3; border-top: 1px solid rgba(200,160,60,0.25); padding: 6px 16px; }
+    .alert-row { display: flex; align-items: center; padding: 6px 0; border-bottom: 1px solid rgba(0,0,0,0.05); }
+    .alert-row:last-child { border-bottom: none; }
+    .alert-text { font-size: 13px; color: #5a4010; flex: 1; }
+    .alert-badge { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 10px; margin-left: 8px; white-space: nowrap; flex-shrink: 0; }
+    .alert-dismiss { background: none; border: none; font-size: 15px; color: #b09050; cursor: pointer; padding: 0 2px 0 8px; flex-shrink: 0; }
+    .nav { display: flex; gap: 5px; padding: 8px 0 10px; }
+    .nav-btn { flex: 1; padding: 7px 2px; border-radius: 8px; border: none; font-family: 'Lato', sans-serif; font-size: 11px; cursor: pointer; transition: all 0.15s; background: rgba(255,255,255,0.08); color: #d4c4a8; }
+    .nav-btn.active { background: var(--gold); color: var(--brown-dark); font-weight: 700; }
+    .main { flex: 1; overflow-y: auto; padding: 16px 16px calc(env(safe-area-inset-bottom) + 20px); -webkit-overflow-scrolling: touch; }
+    .filter-row { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 14px; scrollbar-width: none; }
+    .filter-row::-webkit-scrollbar { display: none; }
+    .filter-btn { padding: 5px 14px; border-radius: 20px; white-space: nowrap; cursor: pointer; font-family: 'Lato', sans-serif; font-size: 12px; border: 1px solid var(--border-light); background: transparent; color: var(--brown-mid); }
+    .filter-btn.active { background: var(--brown-dark); color: var(--gold-light); border-color: var(--brown-dark); }
+    .item-card { background: var(--cream-card); border-radius: 14px; border: 1px solid var(--border); overflow: hidden; margin-bottom: 10px; }
+    .item-card.card-expired { border-color: var(--red); border-width: 1.5px; }
+    .item-card.card-warn { border-color: var(--amber); border-width: 1.5px; }
+    .item-card-header { padding: 14px 16px; cursor: pointer; }
+    .item-card-row { display: flex; justify-content: space-between; align-items: flex-start; }
+    .item-name { font-weight: 700; font-size: 16px; }
+    .item-meta { font-size: 11px; color: var(--brown-light); margin-top: 4px; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+    .item-tag { border-radius: 10px; padding: 2px 8px; }
+    .tag-default { background: var(--cream-tag); color: var(--brown-mid); }
+    .tag-warn { background: #fff0cc; color: #8a6010; }
+    .tag-danger { background: #ffe8e0; color: #8a2010; }
+    .tag-forgotten { background: #ece8f8; color: #6050a0; }
+    .item-portions { text-align: right; flex-shrink: 0; margin-left: 10px; }
+    .item-portions-num { font-size: 24px; font-weight: 700; line-height: 1; }
+    .item-portions-lbl { font-size: 10px; color: var(--brown-light); }
+    .progress-track { background: var(--border-light); border-radius: 4px; height: 5px; margin-top: 10px; }
+    .progress-bar { height: 100%; border-radius: 4px; transition: width 0.3s; }
+    .item-details { padding: 0 16px 14px; border-top: 1px solid var(--cream-tag); }
+    .macro-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 6px; margin: 12px 0; }
+    .macro-cell { background: var(--cream-tag); border-radius: 8px; padding: 6px 4px; text-align: center; }
+    .macro-val { font-size: 13px; font-weight: 700; }
+    .macro-lbl { font-size: 10px; color: var(--brown-light); }
+    .item-notes { font-size: 12px; color: var(--brown-mid); margin-bottom: 10px; font-style: italic; }
+    .expiry-line { font-size: 12px; color: var(--brown-light); margin-bottom: 10px; }
+    .action-row { display: flex; gap: 8px; }
+    .btn-primary { background: var(--brown-dark); color: var(--gold-light); border: none; border-radius: 10px; padding: 12px 20px; font-size: 14px; font-weight: 700; cursor: pointer; font-family: 'Lato', sans-serif; }
+    .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-secondary { background: transparent; color: var(--brown-dark); border: 1px solid #c8b89a; border-radius: 10px; padding: 12px 20px; font-size: 14px; cursor: pointer; font-family: 'Lato', sans-serif; }
+    .btn-danger { color: var(--red) !important; border-color: var(--red) !important; }
+    .btn-full { width: 100%; }
+    .btn-flex { flex: 1; }
+    .btn-sm { padding: 8px 14px; font-size: 13px; }
+    .form-label { display: block; font-size: 11px; color: var(--brown-mid); margin-bottom: 4px; margin-top: 14px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; }
+    .form-input { width: 100%; padding: 11px 14px; border-radius: 10px; border: 1px solid #d4c4a8; background: var(--cream-card); font-size: 15px; color: var(--brown-dark); font-family: 'Lato', sans-serif; outline: none; -webkit-appearance: none; }
+    .form-input:focus { border-color: var(--gold); }
+    .form-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .section-heading { font-family: 'Playfair Display', serif; font-size: 15px; margin: 18px 0 2px; color: #5a3e2a; }
+    .page-title { font-family: 'Playfair Display', serif; font-size: 22px; margin-bottom: 6px; }
+    .page-sub { color: var(--brown-mid); font-size: 13px; margin-bottom: 20px; }
+    .log-btn { background: var(--cream-card); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; width: 100%; text-align: left; cursor: pointer; display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-family: 'Lato', sans-serif; }
+    .log-btn.forgotten-item { border-color: #9080c0; }
+    .log-btn-name { font-weight: 700; font-size: 15px; color: var(--brown-dark); }
+    .log-btn-meta { font-size: 12px; color: var(--brown-mid); margin-top: 2px; }
+    .log-btn-badge { background: var(--brown-dark); color: var(--gold-light); border-radius: 20px; padding: 4px 14px; font-size: 14px; font-weight: 700; flex-shrink: 0; }
+    .history-day-header { display: flex; justify-content: space-between; align-items: baseline; margin: 16px 0 4px; }
+    .history-day-label { font-size: 11px; font-weight: 700; color: var(--brown-mid); text-transform: uppercase; letter-spacing: 0.8px; }
+    .history-day-macros { font-size: 11px; color: var(--brown-light); }
+    .history-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border-light); }
+    .history-row:last-child { border-bottom: none; }
+    .history-icon { font-size: 18px; width: 26px; text-align: center; flex-shrink: 0; }
+    .history-name { font-size: 14px; font-weight: 700; }
+    .history-meta { font-size: 12px; color: var(--brown-mid); }
+    .settings-block { margin-bottom: 24px; }
+    .settings-block-title { font-family: 'Playfair Display', serif; font-size: 17px; margin-bottom: 2px; }
+    .settings-block-sub { font-size: 12px; color: var(--brown-light); margin-bottom: 12px; }
+    .settings-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--border-light); }
+    .settings-row:last-child { border-bottom: none; }
+    .settings-label { font-size: 14px; }
+    .settings-sublabel { font-size: 12px; color: var(--brown-light); margin-top: 2px; }
+    .settings-input { width: 72px; padding: 7px 10px; border-radius: 8px; border: 1px solid #d4c4a8; background: var(--cream-card); font-size: 14px; color: var(--brown-dark); font-family: 'Lato', sans-serif; outline: none; text-align: center; -webkit-appearance: none; }
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 200; display: flex; align-items: flex-end; animation: fadeIn 0.15s ease; }
+    .modal-sheet { background: var(--cream-card); border-radius: 20px 20px 0 0; padding: 24px 24px calc(env(safe-area-inset-bottom) + 24px); width: 100%; animation: slideUp 0.2s ease; }
+    .modal-title { font-family: 'Playfair Display', serif; font-size: 18px; margin-bottom: 4px; }
+    .modal-sub { color: var(--brown-mid); font-size: 13px; margin-bottom: 16px; }
+    .stepper { display: flex; align-items: center; gap: 20px; }
+    .stepper-btn { width: 44px; height: 44px; border-radius: 10px; border: 1px solid #c8b89a; background: transparent; font-size: 22px; cursor: pointer; font-family: 'Lato', sans-serif; flex-shrink: 0; }
+    .stepper-val { font-size: 28px; font-weight: 700; min-width: 40px; text-align: center; }
+    .macro-preview { background: var(--cream-tag); border-radius: 8px; padding: 10px 14px; margin-top: 14px; font-size: 13px; color: #5a3e2a; line-height: 1.6; }
+    .empty-state { text-align: center; padding: 48px 20px; color: var(--brown-light); }
+    .empty-icon { font-size: 40px; margin-bottom: 12px; }
+    .empty-title { font-family: 'Playfair Display', serif; font-size: 18px; margin-bottom: 6px; color: var(--brown-mid); }
+    .empty-sub { font-size: 13px; }
+    .loading-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 16px; background: var(--cream); }
+    .loading-title { font-family: 'Playfair Display', serif; font-size: 22px; color: var(--brown-dark); }
+    .loading-sub { font-size: 13px; color: var(--brown-light); }
+    .spinner { width: 32px; height: 32px; border: 3px solid var(--border); border-top-color: var(--gold); border-radius: 50%; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes fadeIn { from { opacity:0 } to { opacity:1 } }
+    @keyframes slideUp { from { transform:translateY(30px);opacity:0 } to { transform:translateY(0);opacity:1 } }
+    button { -webkit-tap-highlight-color: transparent; }
   </style>
 </head>
 <body>
 <div id="app"></div>
 <script>
-// ---- Supabase config ----
-const SB_URL = 'https://zbeuowizrnkotijtzoeh.supabase.co';
-const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpiZXVvd2l6cm5rb3RpanR6b2VoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyODM4MDIsImV4cCI6MjA5MTg1OTgwMn0.c8_qca_JiWE0GAnuHW5RMtGgER7ywGO6rHifcCg1frI';
-const SB_TABLE = 'prepmacros_data';
-const SB_ROW = 'singleton';
-const LOCAL_KEY = 'prepmacros-v2';
+var SB_URL = 'https://zbeuowizrnkotijtzoeh.supabase.co';
+var SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpiZXVvd2l6cm5rb3RpanR6b2VoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyODM4MDIsImV4cCI6MjA5MTg1OTgwMn0.c8_qca_JiWE0GAnuHW5RMtGgER7ywGO6rHifcCg1frI';
+var SB_TABLE = 'prepmacros_data';
+var LOCAL_KEY = 'prepmacros-v2';
+var CATS = ['All','Protein','Carbs','Veg','Snack','Dessert','Creami Base','Other'];
+var DEFAULTS = { lowStockThreshold:3, expiryDays:5, forgottenDays:14 };
 
-const CATS = [‘All’,‘Protein’,‘Carbs’,‘Veg’,‘Snack’,‘Dessert’,‘Creami Base’,‘Other’];
-const DEFAULTS = { lowStockThreshold:3, expiryDays:5, forgottenDays:14 };
-
-let S = {
-items:[], history:[], settings:{…DEFAULTS}, dismissedAlerts:{},
+var S = {
+items:[], history:[], settings:objAssign({},DEFAULTS), dismissedAlerts:{},
 view:‘stock’, filterCat:‘All’, expandedId:null,
 modal:null, logPortions:1, restockPortions:’’, wastePortions:1,
-editForm:null,
-syncStatus:‘syncing’, // ‘syncing’ | ‘synced’ | ‘error’
+editForm:null, syncStatus:‘syncing’, syncMsg:‘Loading…’,
 form:{ name:’’,category:‘Protein’,portions:’’,expiryDays:’’,cal:’’,protein:’’,carbs:’’,fat:’’,notes:’’ }
 };
 
-// –– Supabase API ––
-async function sbFetch(method, body) {
-const url = `${SB_URL}/rest/v1/${SB_TABLE}?id=eq.${SB_ROW}`;
-const res = await fetch(method === ‘GET’ ? url : url, {
-method,
-headers: {
-‘apikey’: SB_KEY,
-‘Authorization’: `Bearer ${SB_KEY}`,
-‘Content-Type’: ‘application/json’,
-‘Prefer’: method === ‘PATCH’ ? ‘return=minimal’ : ‘return=representation’
-},
-body: body ? JSON.stringify(body) : undefined
-});
-if (!res.ok) throw new Error(`Supabase ${method} failed: ${res.status}`);
-if (method === ‘GET’) return res.json();
-return null;
+function objAssign(target, source) {
+for (var k in source) { if (source.hasOwnProperty(k)) target[k] = source[k]; }
+return target;
 }
 
-async function cloudLoad() {
-try {
-const rows = await sbFetch(‘GET’);
-if (rows && rows.length > 0) {
-const r = rows[0];
-S.items = r.items || [];
-S.history = r.history || [];
-S.settings = { …DEFAULTS, …(r.settings || {}) };
-S.dismissedAlerts = r.dismissed_alerts || {};
-localSave();
+// XHR-based Supabase calls (no fetch, better iOS compat)
+function sbGet(callback) {
+var xhr = new XMLHttpRequest();
+var url = SB_URL + ‘/rest/v1/’ + SB_TABLE + ‘?id=eq.singleton’;
+xhr.open(‘GET’, url, true);
+xhr.setRequestHeader(‘apikey’, SB_KEY);
+xhr.setRequestHeader(‘Authorization’, ’Bearer ’ + SB_KEY);
+xhr.setRequestHeader(‘Content-Type’, ‘application/json’);
+xhr.onreadystatechange = function() {
+if (xhr.readyState !== 4) return;
+if (xhr.status >= 200 && xhr.status < 300) {
+try { callback(null, JSON.parse(xhr.responseText)); }
+catch(e) { callback(’Parse error: ’ + e.message); }
 } else {
-S._debugMsg = ‘Supabase returned empty rows — table may be empty’;
+callback(’HTTP ’ + xhr.status + ’: ’ + xhr.responseText);
 }
-} catch(e) {
-S._debugMsg = ’cloudLoad error: ’ + e.message;
-throw e;
-}
+};
+xhr.onerror = function() { callback(‘Network error’); };
+xhr.send();
 }
 
-async function cloudSave() {
+function sbPatch(data, callback) {
+var xhr = new XMLHttpRequest();
+var url = SB_URL + ‘/rest/v1/’ + SB_TABLE + ‘?id=eq.singleton’;
+xhr.open(‘PATCH’, url, true);
+xhr.setRequestHeader(‘apikey’, SB_KEY);
+xhr.setRequestHeader(‘Authorization’, ’Bearer ’ + SB_KEY);
+xhr.setRequestHeader(‘Content-Type’, ‘application/json’);
+xhr.setRequestHeader(‘Prefer’, ‘return=minimal’);
+xhr.onreadystatechange = function() {
+if (xhr.readyState !== 4) return;
+if (xhr.status >= 200 && xhr.status < 300) {
+callback(null);
+} else {
+callback(’HTTP ’ + xhr.status + ’: ’ + xhr.responseText);
+}
+};
+xhr.onerror = function() { callback(‘Network error’); };
+xhr.send(JSON.stringify(data));
+}
+
+// Local cache
+function localSave() {
+try { localStorage.setItem(LOCAL_KEY, JSON.stringify({ items:S.items, history:S.history, settings:S.settings, dismissedAlerts:S.dismissedAlerts })); } catch(e){}
+}
+function localLoad() {
 try {
-await sbFetch(‘PATCH’, {
+var r = localStorage.getItem(LOCAL_KEY);
+if (r) {
+var p = JSON.parse(r);
+S.items = p.items || [];
+S.history = p.history || [];
+S.settings = objAssign(objAssign({},DEFAULTS), p.settings || {});
+S.dismissedAlerts = p.dismissedAlerts || {};
+}
+} catch(e){}
+}
+
+var saveTimer = null;
+function save() {
+localSave();
+S.syncStatus = ‘syncing’;
+S.syncMsg = ‘Syncing\u2026’;
+updateSyncBar();
+clearTimeout(saveTimer);
+saveTimer = setTimeout(function() {
+sbPatch({
 items: S.items,
 history: S.history,
 settings: S.settings,
 dismissed_alerts: S.dismissedAlerts,
 updated_at: new Date().toISOString()
+}, function(err) {
+if (err) {
+S.syncStatus = ‘error’;
+S.syncMsg = ’Sync error: ’ + err;
+} else {
+S.syncStatus = ‘synced’;
+S.syncMsg = ‘Saved to cloud’;
+}
+updateSyncBar();
 });
-S._debugMsg = null;
-} catch(e) {
-S._debugMsg = ’cloudSave error: ’ + e.message;
-throw e;
-}
+}, 800);
 }
 
-// –– Local cache ––
-function localSave() {
-try { localStorage.setItem(LOCAL_KEY, JSON.stringify({ items:S.items, history:S.history, settings:S.settings, dismissedAlerts:S.dismissedAlerts })); } catch(e){}
-}
-function localLoad() {
-try { const r=localStorage.getItem(LOCAL_KEY); if(r){ const p=JSON.parse(r); S.items=p.items||[]; S.history=p.history||[]; S.settings={…DEFAULTS,…(p.settings||{})}; S.dismissedAlerts=p.dismissedAlerts||{}; } } catch(e){}
-}
-
-// Save to local immediately, sync to cloud async
-let saveTimer = null;
-function save() {
-localSave();
-S.syncStatus = ‘syncing’;
-clearTimeout(saveTimer);
-saveTimer = setTimeout(async () => {
-try {
-await cloudSave();
-S.syncStatus = ‘synced’;
-} catch(e) {
-S.syncStatus = ‘error’;
-}
-// re-render just the sync bar without full re-render
-const bar = document.getElementById(‘sync-bar’);
+function updateSyncBar() {
+var bar = document.getElementById(‘sync-bar’);
 if (bar) {
-bar.className = `sync-bar ${S.syncStatus}`;
-bar.innerHTML = syncBarHTML();
-}
-}, 800); // debounce — waits 800ms after last change before syncing
-}
-
-// –– Init ––
-async function init() {
-// Show loading screen
-document.getElementById(‘app’).innerHTML = ` <div class="loading-screen"> <div class="spinner"></div> <div class="loading-title">PrepMacros</div> <div class="loading-sub">Loading your stock…</div> </div>`;
-
-// Load local cache first for instant feel
-localLoad();
-
-// Then fetch from cloud
-try {
-await cloudLoad();
-S.syncStatus = ‘synced’;
-} catch(e) {
-S.syncStatus = ‘error’;
-if (!S._debugMsg) S._debugMsg = ’Init error: ’ + e.message;
-}
-
-// Always render regardless of sync outcome
-try {
-render();
-} catch(e) {
-document.getElementById(‘app’).innerHTML = ` <div class="loading-screen"> <div class="loading-title">PrepMacros</div> <div class="loading-sub" style="color:#b85c38">Render error: ${e.message}</div> </div>`;
+bar.className = ’sync-bar ’ + S.syncStatus;
+bar.innerHTML = ‘<div class="sync-dot"></div><span style="word-break:break-all">’ + S.syncMsg + ‘</span>’;
 }
 }
 
-// –– Helpers ––
+// Helpers
 function daysSince(d) { if(!d)return null; return Math.floor((Date.now()-new Date(d))/86400000); }
-function daysAgo(d) { const n=daysSince(d); if(n===null)return null; if(n===0)return’today’; if(n===1)return’yesterday’; return n+‘d ago’; }
+function daysAgo(d) { var n=daysSince(d); if(n===null)return null; if(n===0)return’today’; if(n===1)return’yesterday’; return n+‘d ago’; }
 function todayStr() { return new Date().toISOString().split(‘T’)[0]; }
 function barColor(p) { return p>0.5?’#7a9e7e’:p>0.25?’#c4a84b’:’#b85c38’; }
 
 function todayMacros() {
-const t=todayStr(); let cal=0,pro=0,carb=0,fat=0,any=false;
-S.history.filter(h=>h.type===‘eat’&&h.date?.startsWith(t)).forEach(h=>{
-const it=S.items.find(x=>x.id===h.itemId);
-if(it?.macros?.cal){ cal+=parseFloat(it.macros.cal)*h.portions; pro+=parseFloat(it.macros.protein||0)*h.portions; carb+=parseFloat(it.macros.carbs||0)*h.portions; fat+=parseFloat(it.macros.fat||0)*h.portions; any=true; }
+var t=todayStr(); var cal=0,pro=0,carb=0,fat=0,any=false;
+S.history.filter(function(h){return h.type===‘eat’&&h.date&&h.date.indexOf(t)===0;}).forEach(function(h){
+var it=S.items.filter(function(x){return x.id===h.itemId;})[0];
+if(it&&it.macros&&it.macros.cal){ cal+=parseFloat(it.macros.cal)*h.portions; pro+=parseFloat(it.macros.protein||0)*h.portions; carb+=parseFloat(it.macros.carbs||0)*h.portions; fat+=parseFloat(it.macros.fat||0)*h.portions; any=true; }
 });
 return any?{cal:Math.round(cal),protein:Math.round(pro),carbs:Math.round(carb),fat:Math.round(fat)}:null;
 }
@@ -294,35 +274,35 @@ return any?{cal:Math.round(cal),protein:Math.round(pro),carbs:Math.round(carb),f
 function isDismissedToday(key) { return S.dismissedAlerts[key]===todayStr(); }
 
 function getAlerts() {
-const alerts=[];
-S.items.forEach(it=>{
+var alerts=[];
+S.items.forEach(function(it){
 if(it.portions===0) return;
-const expDays=it.expiryDays!=null?it.expiryDays:S.settings.expiryDays;
-const age=daysSince(it.prepDate);
+var expDays=it.expiryDays!=null?it.expiryDays:S.settings.expiryDays;
+var age=daysSince(it.prepDate);
 if(expDays&&age!==null){
-if(age>=expDays&&!isDismissedToday(`exp-${it.id}`))
-alerts.push({key:`exp-${it.id}`,type:‘expired’,item:it,msg:`${it.name} may have expired`,badge:`${age}d old`,col:’#b85c38’});
-else if(age>=expDays-1&&age<expDays&&!isDismissedToday(`expw-${it.id}`))
-alerts.push({key:`expw-${it.id}`,type:‘expiring’,item:it,msg:`${it.name} expires tomorrow`,badge:‘1d left’,col:’#c4a84b’});
+if(age>=expDays&&!isDismissedToday(‘exp-’+it.id))
+alerts.push({key:‘exp-’+it.id,type:‘expired’,item:it,msg:it.name+’ may have expired’,badge:age+‘d old’,col:’#b85c38’});
+else if(age>=expDays-1&&age<expDays&&!isDismissedToday(‘expw-’+it.id))
+alerts.push({key:‘expw-’+it.id,type:‘expiring’,item:it,msg:it.name+’ expires tomorrow’,badge:‘1d left’,col:’#c4a84b’});
 }
-const lastRef=it.lastEaten||it.prepDate;
-const sinceEat=daysSince(lastRef);
-if(sinceEat!==null&&sinceEat>=S.settings.forgottenDays&&!isDismissedToday(`fgt-${it.id}`))
-alerts.push({key:`fgt-${it.id}`,type:‘forgotten’,item:it,msg:`Haven't eaten ${it.name}`,badge:`${sinceEat}d`,col:’#6050a0’});
+var lastRef=it.lastEaten||it.prepDate;
+var sinceEat=daysSince(lastRef);
+if(sinceEat!==null&&sinceEat>=S.settings.forgottenDays&&!isDismissedToday(‘fgt-’+it.id))
+alerts.push({key:‘fgt-’+it.id,type:‘forgotten’,item:it,msg:“Haven’t eaten “+it.name,badge:sinceEat+‘d’,col:’#6050a0’});
 });
 return alerts;
 }
 
 function dismissAlert(key) { S.dismissedAlerts[key]=todayStr(); save(); render(); }
-function totP() { return S.items.reduce((s,it)=>s+it.portions,0); }
-function lowC() { return S.items.filter(it=>it.portions>0&&it.portions<=S.settings.lowStockThreshold).length; }
-function outC() { return S.items.filter(it=>it.portions===0).length; }
+function totP() { return S.items.reduce(function(s,it){return s+it.portions;},0); }
+function lowC() { return S.items.filter(function(it){return it.portions>0&&it.portions<=S.settings.lowStockThreshold;}).length; }
+function outC() { return S.items.filter(function(it){return it.portions===0;}).length; }
 
-// –– Actions ––
+// Actions
 function addItem() {
-const f=S.form;
+var f=S.form;
 if(!f.name.trim()||!f.portions) return;
-const item={id:Date.now().toString(),name:f.name.trim(),category:f.category,portions:parseInt(f.portions),totalPortions:parseInt(f.portions),
+var item={id:Date.now().toString(),name:f.name.trim(),category:f.category,portions:parseInt(f.portions),totalPortions:parseInt(f.portions),
 expiryDays:f.expiryDays?parseInt(f.expiryDays):null,
 macros:{cal:f.cal,protein:f.protein,carbs:f.carbs,fat:f.fat},notes:f.notes,prepDate:new Date().toISOString(),lastEaten:null};
 S.items.push(item);
@@ -331,108 +311,125 @@ save(); S.form={name:’’,category:‘Protein’,portions:’’,expiryDays:�
 }
 
 function restockItem() {
-const n=parseInt(S.restockPortions); if(!n||!S.modal) return;
-const id=S.modal.item.id;
-S.items=S.items.map(it=>it.id===id?{…it,portions:it.portions+n,totalPortions:it.totalPortions+n,prepDate:new Date().toISOString()}:it);
+var n=parseInt(S.restockPortions); if(!n||!S.modal) return;
+var id=S.modal.item.id;
+S.items=S.items.map(function(it){return it.id===id?objAssign(objAssign({},it),{portions:it.portions+n,totalPortions:it.totalPortions+n,prepDate:new Date().toISOString()}):it;});
 S.history.unshift({type:‘prep’,itemId:id,itemName:S.modal.item.name,portions:n,date:new Date().toISOString()});
-[‘exp’,‘expw’,‘fgt’].forEach(p=>delete S.dismissedAlerts[`${p}-${id}`]);
+[‘exp’,‘expw’,‘fgt’].forEach(function(p){delete S.dismissedAlerts[p+’-’+id];});
 save(); S.modal=null; S.restockPortions=’’; render();
 }
 
 function logMeal() {
 if(!S.modal) return;
-const n=Math.min(S.logPortions,S.modal.item.portions); const id=S.modal.item.id;
-S.items=S.items.map(it=>it.id===id?{…it,portions:Math.max(0,it.portions-n),lastEaten:new Date().toISOString()}:it);
+var n=Math.min(S.logPortions,S.modal.item.portions); var id=S.modal.item.id;
+S.items=S.items.map(function(it){return it.id===id?objAssign(objAssign({},it),{portions:Math.max(0,it.portions-n),lastEaten:new Date().toISOString()}):it;});
 S.history.unshift({type:‘eat’,itemId:id,itemName:S.modal.item.name,portions:n,date:new Date().toISOString()});
-delete S.dismissedAlerts[`fgt-${id}`];
+delete S.dismissedAlerts[‘fgt-’+id];
 save(); S.modal=null; S.logPortions=1; render();
 }
 
 function removeItem(id) {
-const it=S.items.find(x=>x.id===id);
+var it=S.items.filter(function(x){return x.id===id;})[0];
 if(it) S.history.unshift({type:‘deleted’,itemId:id,itemName:it.name,portions:it.portions,date:new Date().toISOString()});
-S.items=S.items.filter(x=>x.id!==id); S.modal=null; save(); render();
+S.items=S.items.filter(function(x){return x.id!==id;}); S.modal=null; save(); render();
 }
 
 function openEdit(id) {
-const it=S.items.find(x=>x.id===id); if(!it) return;
-S.editForm={id,name:it.name,category:it.category,expiryDays:it.expiryDays||’’,
-cal:it.macros?.cal||’’,protein:it.macros?.protein||’’,carbs:it.macros?.carbs||’’,fat:it.macros?.fat||’’,notes:it.notes||’’};
+var it=S.items.filter(function(x){return x.id===id;})[0]; if(!it) return;
+S.editForm={id:id,name:it.name,category:it.category,expiryDays:it.expiryDays||’’,
+cal:(it.macros&&it.macros.cal)||’’,protein:(it.macros&&it.macros.protein)||’’,carbs:(it.macros&&it.macros.carbs)||’’,fat:(it.macros&&it.macros.fat)||’’,notes:it.notes||’’};
 S.modal={type:‘edit’,item:it}; render();
 }
 
 function saveEdit() {
-const f=S.editForm; if(!f) return;
-S.items=S.items.map(it=>it.id===f.id?{…it,
+var f=S.editForm; if(!f) return;
+S.items=S.items.map(function(it){
+if(it.id!==f.id) return it;
+return objAssign(objAssign({},it),{
 name:f.name.trim()||it.name,category:f.category,
 expiryDays:f.expiryDays?parseInt(f.expiryDays):null,
 macros:{cal:f.cal,protein:f.protein,carbs:f.carbs,fat:f.fat},
 notes:f.notes
-}:it);
+});
+});
 save(); S.modal=null; S.editForm=null; render();
 }
 
 function wastePortions() {
 if(!S.modal) return;
-const n=Math.min(S.wastePortions,S.modal.item.portions); const id=S.modal.item.id;
-const wasAll=S.modal.item.portions-n<=0;
-S.items=S.items.map(it=>it.id===id?{…it,portions:Math.max(0,it.portions-n)}:it);
+var n=Math.min(S.wastePortions,S.modal.item.portions); var id=S.modal.item.id;
+var wasAll=S.modal.item.portions-n<=0;
+S.items=S.items.map(function(it){return it.id===id?objAssign(objAssign({},it),{portions:Math.max(0,it.portions-n)}):it;});
 S.history.unshift({type:‘waste’,itemId:id,itemName:S.modal.item.name,portions:n,date:new Date().toISOString()});
-if(wasAll) S.items=S.items.filter(it=>it.id!==id);
+if(wasAll) S.items=S.items.filter(function(it){return it.id!==id;});
 save(); S.modal=null; S.wastePortions=1; render();
 }
 
 function saveSettings() {
-const g=(id,fb)=>{const e=document.getElementById(id); return e?parseInt(e.value)||fb:fb;};
+function g(id,fb){var e=document.getElementById(id); return e?parseInt(e.value)||fb:fb;}
 S.settings.lowStockThreshold=g(‘s-low’,3); S.settings.expiryDays=g(‘s-exp’,5); S.settings.forgottenDays=g(‘s-fgt’,14);
 save(); render();
 }
 
 function exportData() {
-const blob=new Blob([JSON.stringify({items:S.items,history:S.history,settings:S.settings},null,2)],{type:‘application/json’});
-const a=document.createElement(‘a’); a.href=URL.createObjectURL(blob); a.download=`prepmacros-${todayStr()}.json`; a.click();
+var blob=new Blob([JSON.stringify({items:S.items,history:S.history,settings:S.settings},null,2)],{type:‘application/json’});
+var a=document.createElement(‘a’); a.href=URL.createObjectURL(blob); a.download=‘prepmacros-’+todayStr()+’.json’; a.click();
 }
 
 function importData(file) {
-const r=new FileReader(); r.onload=e=>{
-try{ const p=JSON.parse(e.target.result);
-if(p.items){S.items=p.items;S.history=p.history||[];S.settings={…DEFAULTS,…(p.settings||{})};save();render();alert(‘Import successful!’);}
+var r=new FileReader(); r.onload=function(e){
+try{ var p=JSON.parse(e.target.result);
+if(p.items){S.items=p.items;S.history=p.history||[];S.settings=objAssign(objAssign({},DEFAULTS),p.settings||{});save();render();alert(‘Import successful!’);}
 else alert(‘Invalid file.’);
-}catch{alert(‘Could not read file.’);}
+}catch(ex){alert(‘Could not read file.’);}
 }; r.readAsText(file);
 }
 
-// –– Render ––
-function syncBarHTML() {
-const labels = { syncing:‘Syncing…’, synced:‘Saved to cloud’, error:‘Offline — saved locally’ };
-const msg = S.syncStatus === ‘error’ && S._debugMsg ? S._debugMsg : (labels[S.syncStatus]||’’);
-return `<div class="sync-dot"></div><span style="word-break:break-all">${msg}</span>`;
-}
-
+// Render
 function render() {
-document.getElementById(‘app’).innerHTML =
-`<div id="sync-bar" class="sync-bar ${S.syncStatus}">${syncBarHTML()}</div>` +
-renderHeader() +
-`<div class="main">${renderMain()}</div>` +
-(S.modal ? renderModal() : ‘’);
+var html = ‘<div id="sync-bar" class="sync-bar '+S.syncStatus+'"><div class="sync-dot"></div><span style="word-break:break-all">’+S.syncMsg+’</span></div>’;
+html += renderHeader();
+html += ‘<div class="main">’ + renderMain() + ‘</div>’;
+if (S.modal) html += renderModal();
+document.getElementById(‘app’).innerHTML = html;
 attachEvents();
 }
 
 function renderHeader() {
-const macros=todayMacros(),alerts=getAlerts(),low=lowC(),out=outC();
-return `<div class="header"> <div class="header-top"> <div><div class="header-title">PrepMacros</div><div class="header-sub">Stock Tracker</div></div> <div class="stat-pills"> <div class="stat-pill"><div class="stat-pill-val" style="color:#c8a96e">${totP()}</div><div class="stat-pill-lbl">Portions</div></div> ${low?`<div class="stat-pill"><div class="stat-pill-val" style="color:#d4a843">${low}</div><div class="stat-pill-lbl">Low</div></div>`:''} ${out?`<div class="stat-pill"><div class="stat-pill-val" style="color:#b85c38">${out}</div><div class="stat-pill-lbl">Out</div></div>`:''} ${alerts.length?`<div class="stat-pill"><div class="stat-pill-val" style="color:#e0a030">${alerts.length}</div><div class="stat-pill-lbl">Alerts</div></div>`:''} </div> </div> ${macros?`<div class="today-strip">
-<div class="today-label">Today</div>
-<div class="today-macro"><div class="today-macro-val">${macros.cal}</div><div class="today-macro-lbl">Cal</div></div>
-<div class="today-macro"><div class="today-macro-val">${macros.protein}g</div><div class="today-macro-lbl">Protein</div></div>
-<div class="today-macro"><div class="today-macro-val">${macros.carbs}g</div><div class="today-macro-lbl">Carbs</div></div>
-<div class="today-macro"><div class="today-macro-val">${macros.fat}g</div><div class="today-macro-lbl">Fat</div></div>
-</div>`:''} ${alerts.length?`<div class="alerts-banner">${alerts.map(a=>` <div class="alert-row"> <div class="alert-text">${aIcon(a.type)} ${a.msg}</div> <span class="alert-badge" style="background:${a.col}22;color:${a.col}">${a.badge}</span> <button class="alert-dismiss" data-dismiss="${a.key}">✕</button> </div>`).join(’’)}</div>`:''} <div class="nav"> ${[['stock','📦 Stock'],['add','+ Add'],['log','🍽 Log'],['history','📋 Hist'],['settings','⚙️']].map(([v,l])=> `<button class="nav-btn${S.view===v?' active':''}" data-nav="${v}">${l}</button>`).join(’’)}
-</div>
-
-  </div>`;
+var macros=todayMacros(), alerts=getAlerts(), low=lowC(), out=outC();
+var h = ‘<div class="header"><div class="header-top">’;
+h += ‘<div><div class="header-title">PrepMacros</div><div class="header-sub">Stock Tracker</div></div>’;
+h += ‘<div class="stat-pills">’;
+h += ‘<div class="stat-pill"><div class="stat-pill-val" style="color:#c8a96e">’+totP()+’</div><div class="stat-pill-lbl">Portions</div></div>’;
+if(low) h += ‘<div class="stat-pill"><div class="stat-pill-val" style="color:#d4a843">’+low+’</div><div class="stat-pill-lbl">Low</div></div>’;
+if(out) h += ‘<div class="stat-pill"><div class="stat-pill-val" style="color:#b85c38">’+out+’</div><div class="stat-pill-lbl">Out</div></div>’;
+if(alerts.length) h += ‘<div class="stat-pill"><div class="stat-pill-val" style="color:#e0a030">’+alerts.length+’</div><div class="stat-pill-lbl">Alerts</div></div>’;
+h += ‘</div></div>’;
+if(macros) {
+h += ‘<div class="today-strip"><div class="today-label">Today</div>’;
+h += ‘<div class="today-macro"><div class="today-macro-val">’+macros.cal+’</div><div class="today-macro-lbl">Cal</div></div>’;
+h += ‘<div class="today-macro"><div class="today-macro-val">’+macros.protein+‘g</div><div class="today-macro-lbl">Protein</div></div>’;
+h += ‘<div class="today-macro"><div class="today-macro-val">’+macros.carbs+‘g</div><div class="today-macro-lbl">Carbs</div></div>’;
+h += ‘<div class="today-macro"><div class="today-macro-val">’+macros.fat+‘g</div><div class="today-macro-lbl">Fat</div></div></div>’;
+}
+if(alerts.length) {
+h += ‘<div class="alerts-banner">’;
+alerts.forEach(function(a){
+h += ‘<div class="alert-row"><div class="alert-text">’+aIcon(a.type)+’ ‘+a.msg+’</div>’;
+h += ‘<span class="alert-badge" style="background:'+a.col+'22;color:'+a.col+'">’+a.badge+’</span>’;
+h += ‘<button class="alert-dismiss" data-dismiss="'+a.key+'">✕</button></div>’;
+});
+h += ‘</div>’;
+}
+h += ‘<div class="nav">’;
+[[‘stock’,’📦 Stock’],[‘add’,’+ Add’],[‘log’,’🆎 Log’],[‘history’,’📋 Hist’],[‘settings’,’⚙️’]].forEach(function(v){
+h += ‘<button class="nav-btn'+(S.view===v[0]?' active':'')+'" data-nav="'+v[0]+'">’+v[1]+’</button>’;
+});
+h += ‘</div></div>’;
+return h;
 }
 
-function aIcon(t) { return t===‘expired’?‘⚠️’:t===‘expiring’?‘🕐’:‘💤’; }
+function aIcon(t) { return t===‘expired’?’⚠️’:t===‘expiring’?’🕐’:’💤’; }
 
 function renderMain() {
 if(S.view===‘stock’) return renderStock();
@@ -444,199 +441,270 @@ return ‘’;
 }
 
 function renderStock() {
-const items=S.filterCat===‘All’?S.items:S.items.filter(it=>it.category===S.filterCat);
-return `<div class="filter-row">${CATS.map(c=>`<button class="filter-btn${S.filterCat===c?' active':''}" data-filter="${c}">${c}</button>`).join('')}</div> ${!items.length?`<div class="empty-state"><div class="empty-icon">🥡</div><div class="empty-title">No items yet</div><div class="empty-sub">Tap “+ Add” to log your first prep batch</div></div>` :items.map(renderCard).join('')}`;
+var items=S.filterCat===‘All’?S.items:S.items.filter(function(it){return it.category===S.filterCat;});
+var h=’<div class="filter-row">’;
+CATS.forEach(function(c){ h+=’<button class="filter-btn'+(S.filterCat===c?' active':'')+'" data-filter="'+c+'">’+c+’</button>’; });
+h+=’</div>’;
+if(!items.length) h+=’<div class="empty-state"><div class="empty-icon">🥡</div><div class="empty-title">No items yet</div><div class="empty-sub">Tap "+ Add" to log your first prep batch</div></div>’;
+else items.forEach(function(it){ h+=renderCard(it); });
+return h;
 }
 
 function renderCard(it) {
-const pct=it.totalPortions>0?it.portions/it.totalPortions:0;
-const exp=S.expandedId===it.id,oos=it.portions===0;
-const isLow=it.portions>0&&it.portions<=S.settings.lowStockThreshold;
-const expDays=it.expiryDays!=null?it.expiryDays:S.settings.expiryDays;
-const age=daysSince(it.prepDate);
-const isExp=expDays&&age>=expDays,isExpW=!isExp&&expDays&&age>=expDays-1;
-const sinceEat=daysSince(it.lastEaten||it.prepDate),isFgt=sinceEat>=S.settings.forgottenDays;
-const cardCls=‘item-card’+(isExp?’ card-expired’:isExpW||isLow?’ card-warn’:’’);
-const portCol=oos?’#b85c38’:isLow?’#c4a84b’:’#3d2b1a’;
-return `<div class="${cardCls}"> <div class="item-card-header" data-expand="${it.id}"> <div class="item-card-row"> <div style="flex:1;min-width:0"> <div class="item-name">${it.name}</div> <div class="item-meta"> <span class="item-tag tag-default">${it.category}</span> ${isExp?`<span class="item-tag tag-danger">⚠️ Expired</span>`:isExpW?`<span class="item-tag tag-warn">🕐 Exp. soon</span>`:`<span>prepped ${daysAgo(it.prepDate)||’—’}</span>`} ${isLow&&!oos?`<span class="item-tag tag-warn">⚡ Low</span>`:''} ${isFgt&&!oos?`<span class="item-tag tag-forgotten">💤 Forgotten</span>`:''} ${it.lastEaten?`<span>eaten ${daysAgo(it.lastEaten)}</span>`:''} </div> </div> <div class="item-portions"><div class="item-portions-num" style="color:${portCol}">${it.portions}</div><div class="item-portions-lbl">portions</div></div> </div> <div class="progress-track"><div class="progress-bar" style="width:${Math.max(2,pct*100)}%;background:${barColor(pct)}"></div></div> </div> ${exp?`<div class="item-details">
-${it.macros?.cal?`<div class="macro-grid"> <div class="macro-cell"><div class="macro-val">${it.macros.cal}</div><div class="macro-lbl">Cal</div></div> <div class="macro-cell"><div class="macro-val">${it.macros.protein}g</div><div class="macro-lbl">Protein</div></div> <div class="macro-cell"><div class="macro-val">${it.macros.carbs}g</div><div class="macro-lbl">Carbs</div></div> <div class="macro-cell"><div class="macro-val">${it.macros.fat}g</div><div class="macro-lbl">Fat</div></div> </div>`:’’}
-${it.notes?`<div class="item-notes">"${it.notes}"</div>`:’’}
-${expDays?`<div class="expiry-line">Expiry window: ${expDays} days · ${isExp?'<span style="color:#b85c38;font-weight:700">Expired</span>':`${expDays-age}d remaining`}</div>`:’’}
-<div class="action-row">
-<button class=“btn-primary btn-flex btn-sm” data-log=”${it.id}” ${oos?‘disabled’:’’}>🍽 Eat</button>
-<button class="btn-secondary btn-flex btn-sm" data-restock="${it.id}">🥡 Restock</button>
-<button class=“btn-secondary btn-flex btn-sm” data-waste=”${it.id}” ${oos?‘disabled’:’’}>🗑 Waste</button>
-<button class="btn-secondary btn-sm" style="padding:8px 10px" data-edit="${it.id}">✏️</button>
-<button class="btn-secondary btn-danger btn-sm" style="padding:8px 10px" data-confirm-remove="${it.id}">✕</button>
-</div>
-</div>`:’’}
-
-  </div>`;
+var pct=it.totalPortions>0?it.portions/it.totalPortions:0;
+var exp=S.expandedId===it.id, oos=it.portions===0;
+var isLow=it.portions>0&&it.portions<=S.settings.lowStockThreshold;
+var expDays=it.expiryDays!=null?it.expiryDays:S.settings.expiryDays;
+var age=daysSince(it.prepDate);
+var isExp=expDays&&age>=expDays, isExpW=!isExp&&expDays&&age>=expDays-1;
+var sinceEat=daysSince(it.lastEaten||it.prepDate), isFgt=sinceEat>=S.settings.forgottenDays;
+var cardCls=‘item-card’+(isExp?’ card-expired’:isExpW||isLow?’ card-warn’:’’);
+var portCol=oos?’#b85c38’:isLow?’#c4a84b’:’#3d2b1a’;
+var h=’<div class="'+cardCls+'"><div class="item-card-header" data-expand="'+it.id+'">’;
+h+=’<div class="item-card-row"><div style="flex:1;min-width:0"><div class="item-name">’+it.name+’</div><div class="item-meta">’;
+h+=’<span class="item-tag tag-default">’+it.category+’</span>’;
+if(isExp) h+=’<span class="item-tag tag-danger">⚠️ Expired</span>’;
+else if(isExpW) h+=’<span class="item-tag tag-warn">🕐 Exp. soon</span>’;
+else h+=’<span>prepped ‘+(daysAgo(it.prepDate)||’—’)+’</span>’;
+if(isLow&&!oos) h+=’<span class="item-tag tag-warn">⚡ Low</span>’;
+if(isFgt&&!oos) h+=’<span class="item-tag tag-forgotten">💤 Forgotten</span>’;
+if(it.lastEaten) h+=’<span>eaten ‘+daysAgo(it.lastEaten)+’</span>’;
+h+=’</div></div>’;
+h+=’<div class="item-portions"><div class="item-portions-num" style="color:'+portCol+'">’+it.portions+’</div><div class="item-portions-lbl">portions</div></div></div>’;
+h+=’<div class="progress-track"><div class="progress-bar" style="width:'+Math.max(2,pct*100)+'%;background:'+barColor(pct)+'"></div></div>’;
+h+=’</div>’;
+if(exp) {
+h+=’<div class="item-details">’;
+if(it.macros&&it.macros.cal) {
+h+=’<div class="macro-grid">’;
+h+=’<div class="macro-cell"><div class="macro-val">’+it.macros.cal+’</div><div class="macro-lbl">Cal</div></div>’;
+h+=’<div class="macro-cell"><div class="macro-val">’+it.macros.protein+‘g</div><div class="macro-lbl">Protein</div></div>’;
+h+=’<div class="macro-cell"><div class="macro-val">’+it.macros.carbs+‘g</div><div class="macro-lbl">Carbs</div></div>’;
+h+=’<div class="macro-cell"><div class="macro-val">’+it.macros.fat+‘g</div><div class="macro-lbl">Fat</div></div></div>’;
+}
+if(it.notes) h+=’<div class="item-notes">"’+it.notes+’"</div>’;
+if(expDays) h+=’<div class="expiry-line">Expiry: ‘+expDays+’ days · ‘+(isExp?’<span style="color:#b85c38;font-weight:700">Expired</span>’:(expDays-age)+‘d remaining’)+’</div>’;
+h+=’<div class="action-row">’;
+h+=’<button class=“btn-primary btn-flex btn-sm” data-log=”’+it.id+’”’+(oos?’ disabled’:’’)+’>🆎 Eat</button>’;
+h+=’<button class="btn-secondary btn-flex btn-sm" data-restock="'+it.id+'">🥡 Restock</button>’;
+h+=’<button class=“btn-secondary btn-flex btn-sm” data-waste=”’+it.id+’”’+(oos?’ disabled’:’’)+’>🗑 Waste</button>’;
+h+=’<button class="btn-secondary btn-sm" style="padding:8px 10px" data-edit="'+it.id+'">✏️</button>’;
+h+=’<button class="btn-secondary btn-danger btn-sm" style="padding:8px 10px" data-confirm-remove="'+it.id+'">×</button>’;
+h+=’</div></div>’;
+}
+h+=’</div>’;
+return h;
 }
 
 function renderAdd() {
-const f=S.form;
-return `<div class="page-title">Log a Prep Session</div> <label class="form-label">Item name</label> <input class="form-input" id="f-name" value="${f.name}" placeholder="e.g. Shawarma Chicken" /> <label class="form-label">Category</label> <select class="form-input" id="f-cat">${CATS.filter(c=>c!=='All').map(c=>`<option${f.category===c?’ selected’:’’}>${c}</option>`).join(’’)}</select>
-
-  <div class="form-grid-2">
-    <div><label class="form-label">Portions prepped</label><input class="form-input" id="f-portions" type="number" value="${f.portions}" placeholder="e.g. 12" min="1" /></div>
-    <div><label class="form-label">Expires after (days)</label><input class="form-input" id="f-expiry" type="number" value="${f.expiryDays}" placeholder="default: ${S.settings.expiryDays}" min="1" /></div>
-  </div>
-  <div class="section-heading">Macros per portion <span style="font-size:12px;color:#a08060;font-family:'Lato',sans-serif">(optional)</span></div>
-  <div class="form-grid-2">
-    <div><label class="form-label">Calories</label><input class="form-input" id="f-cal" type="number" value="${f.cal}" placeholder="0" min="0" /></div>
-    <div><label class="form-label">Protein (g)</label><input class="form-input" id="f-protein" type="number" value="${f.protein}" placeholder="0" min="0" /></div>
-    <div><label class="form-label">Carbs (g)</label><input class="form-input" id="f-carbs" type="number" value="${f.carbs}" placeholder="0" min="0" /></div>
-    <div><label class="form-label">Fat (g)</label><input class="form-input" id="f-fat" type="number" value="${f.fat}" placeholder="0" min="0" /></div>
-  </div>
-  <label class="form-label">Notes</label>
-  <input class="form-input" id="f-notes" value="${f.notes}" placeholder="e.g. made with thighs, extra spicy" />
-  <button class="btn-primary btn-full" style="margin-top:24px;padding:14px" id="btn-add-item">Add to Stock</button>`;
+var f=S.form;
+var h=’<div class="page-title">Log a Prep Session</div>’;
+h+=’<label class="form-label">Item name</label><input class="form-input" id="f-name" value="'+f.name+'" placeholder="e.g. Shawarma Chicken" />’;
+h+=’<label class="form-label">Category</label><select class="form-input" id="f-cat">’;
+CATS.filter(function(c){return c!==‘All’;}).forEach(function(c){h+=’<option’+(f.category===c?’ selected’:’’)+’>’+c+’</option>’;});
+h+=’</select>’;
+h+=’<div class="form-grid-2">’;
+h+=’<div><label class="form-label">Portions prepped</label><input class="form-input" id="f-portions" type="number" value="'+f.portions+'" placeholder="e.g. 12" min="1" /></div>’;
+h+=’<div><label class="form-label">Expires after (days)</label><input class="form-input" id="f-expiry" type="number" value="'+f.expiryDays+'" placeholder="default: '+S.settings.expiryDays+'" min="1" /></div>’;
+h+=’</div>’;
+h+=’<div class="section-heading">Macros per portion <span style="font-size:12px;color:#a08060;font-family:\'Lato\',sans-serif">(optional)</span></div>’;
+h+=’<div class="form-grid-2">’;
+h+=’<div><label class="form-label">Calories</label><input class="form-input" id="f-cal" type="number" value="'+f.cal+'" placeholder="0" min="0" /></div>’;
+h+=’<div><label class="form-label">Protein (g)</label><input class="form-input" id="f-protein" type="number" value="'+f.protein+'" placeholder="0" min="0" /></div>’;
+h+=’<div><label class="form-label">Carbs (g)</label><input class="form-input" id="f-carbs" type="number" value="'+f.carbs+'" placeholder="0" min="0" /></div>’;
+h+=’<div><label class="form-label">Fat (g)</label><input class="form-input" id="f-fat" type="number" value="'+f.fat+'" placeholder="0" min="0" /></div>’;
+h+=’</div>’;
+h+=’<label class="form-label">Notes</label><input class="form-input" id="f-notes" value="'+f.notes+'" placeholder="e.g. made with thighs, extra spicy" />’;
+h+=’<button class="btn-primary btn-full" style="margin-top:24px;padding:14px" id="btn-add-item">Add to Stock</button>’;
+return h;
 }
 
 function renderLog() {
-const avail=S.items.filter(it=>it.portions>0);
-return `<div class="page-title">Log a Meal</div>
-
-  <div class="page-sub">Tap an item to deduct a portion from stock</div>
-  ${!avail.length?`<div class="empty-state"><div class="empty-icon">😅</div><div class="empty-title">No stock available</div><div class="empty-sub">Time to prep!</div></div>`
-    :avail.map(it=>{
-      const fgt=daysSince(it.lastEaten||it.prepDate)>=S.settings.forgottenDays;
-      return `<button class="log-btn${fgt?' forgotten-item':''}" data-log="${it.id}">
-        <div><div class="log-btn-name">${it.name}${fgt?' 💤':''}</div>
-        <div class="log-btn-meta">${it.category}${it.macros?.cal?` · ${it.macros.cal} cal · ${it.macros.protein}g protein`:''}</div></div>
-        <div class="log-btn-badge">${it.portions}</div>
-      </button>`;
-    }).join('')}`;
+var avail=S.items.filter(function(it){return it.portions>0;});
+var h=’<div class="page-title">Log a Meal</div><div class="page-sub">Tap an item to deduct a portion from stock</div>’;
+if(!avail.length) {
+h+=’<div class="empty-state"><div class="empty-icon">😅</div><div class="empty-title">No stock available</div><div class="empty-sub">Time to prep!</div></div>’;
+} else {
+avail.forEach(function(it){
+var fgt=daysSince(it.lastEaten||it.prepDate)>=S.settings.forgottenDays;
+h+=’<button class="log-btn'+(fgt?' forgotten-item':'')+'" data-log="'+it.id+'">’;
+h+=’<div><div class="log-btn-name">’+it.name+(fgt?’ 💤’:’’)+’</div>’;
+h+=’<div class="log-btn-meta">’+it.category+(it.macros&&it.macros.cal?’ · ‘+it.macros.cal+’ cal · ‘+it.macros.protein+‘g protein’:’’)+’</div></div>’;
+h+=’<div class="log-btn-badge">’+it.portions+’</div></button>’;
+});
+}
+return h;
 }
 
 function renderHistory() {
-const today=todayStr(),grouped={};
-S.history.slice(0,100).forEach(h=>{
-const d=h.date?h.date.split(‘T’)[0]:‘unknown’;
+var today=todayStr(), grouped={};
+S.history.slice(0,100).forEach(function(h){
+var d=h.date?h.date.split(‘T’)[0]:‘unknown’;
 if(!grouped[d]) grouped[d]=[];
 grouped[d].push(h);
 });
-const days=Object.keys(grouped).sort((a,b)=>b.localeCompare(a));
-return `<div class="page-title">Activity History</div> ${!S.history.length?'<div style="text-align:center;padding:40px;color:#a08060">No activity yet</div>' :days.map(day=>{ const label=day===today?'Today':daysAgo(day+'T12:00:00')||day; let dc=0,dp=0,dany=false; grouped[day].filter(h=>h.type==='eat').forEach(h=>{ const it=S.items.find(x=>x.id===h.itemId); if(it?.macros?.cal){dc+=parseFloat(it.macros.cal)*h.portions;dp+=parseFloat(it.macros.protein||0)*h.portions;dany=true;} }); return `<div class="history-day-header"><div class="history-day-label">${label}</div>${dany?`<div class="history-day-macros">${Math.round(dc)} cal · ${Math.round(dp)}g pro</div>`:’’}</div>
-<div style="background:var(--cream-card);border-radius:12px;border:1px solid var(--border);padding:0 14px;margin-bottom:12px">
-${grouped[day].map(h=>`<div class="history-row"> <div class="history-icon">${h.type==='eat'?'🍽':h.type==='waste'?'🗑':h.type==='deleted'?'❌':'🥡'}</div> <div style="flex:1"><div class="history-name">${h.itemName}</div> <div class="history-meta">${h.type==='eat'?`Ate ${h.portions} portion${h.portions>1?‘s’:’’}`:h.type==='waste'?`Wasted ${h.portions} portion${h.portions>1?‘s’:’’}`:h.type==='deleted'?'Removed from stock':`Prepped ${h.portions} portions`}</div></div> </div>`).join(’’)}</div>`; }).join('')}`;
+var days=Object.keys(grouped).sort(function(a,b){return b.localeCompare(a);});
+var h=’<div class="page-title">Activity History</div>’;
+if(!S.history.length) { h+=’<div style="text-align:center;padding:40px;color:#a08060">No activity yet</div>’; return h; }
+days.forEach(function(day){
+var label=day===today?‘Today’:daysAgo(day+‘T12:00:00’)||day;
+var dc=0,dp=0,dany=false;
+grouped[day].filter(function(x){return x.type===‘eat’;}).forEach(function(x){
+var it=S.items.filter(function(z){return z.id===x.itemId;})[0];
+if(it&&it.macros&&it.macros.cal){dc+=parseFloat(it.macros.cal)*x.portions;dp+=parseFloat(it.macros.protein||0)*x.portions;dany=true;}
+});
+h+=’<div class="history-day-header"><div class="history-day-label">’+label+’</div>’;
+if(dany) h+=’<div class="history-day-macros">’+Math.round(dc)+’ cal · ‘+Math.round(dp)+‘g pro</div>’;
+h+=’</div><div style="background:var(--cream-card);border-radius:12px;border:1px solid var(--border);padding:0 14px;margin-bottom:12px">’;
+grouped[day].forEach(function(x){
+var icon=x.type===‘eat’?’🆎’:x.type===‘waste’?’🗑’:x.type===‘deleted’?’❌’:’🥡’;
+var meta=x.type===‘eat’?‘Ate ‘+x.portions+’ portion’+(x.portions>1?‘s’:’’):x.type===‘waste’?‘Wasted ‘+x.portions+’ portion’+(x.portions>1?‘s’:’’):x.type===‘deleted’?‘Removed from stock’:‘Prepped ‘+x.portions+’ portions’;
+h+=’<div class="history-row"><div class="history-icon">’+icon+’</div><div style="flex:1"><div class="history-name">’+x.itemName+’</div><div class="history-meta">’+meta+’</div></div></div>’;
+});
+h+=’</div>’;
+});
+return h;
 }
 
 function renderSettings() {
-const s=S.settings;
-return `<div class="page-title">Settings</div>
-
-  <div class="settings-block">
-    <div class="settings-block-title">Stock Alerts</div>
-    <div class="settings-block-sub">Control when warnings appear on your items and in the header</div>
-    <div class="settings-row">
-      <div><div class="settings-label">Low stock warning</div><div class="settings-sublabel">Warn when portions ≤ this number</div></div>
-      <input class="settings-input" id="s-low" type="number" value="${s.lowStockThreshold}" min="1" max="20" />
-    </div>
-    <div class="settings-row">
-      <div><div class="settings-label">Default expiry (days)</div><div class="settings-sublabel">Applied when no per-item expiry is set</div></div>
-      <input class="settings-input" id="s-exp" type="number" value="${s.expiryDays}" min="1" max="30" />
-    </div>
-  </div>
-  <div class="settings-block">
-    <div class="settings-block-title">Forgotten Item Reminder</div>
-    <div class="settings-block-sub">Shows an alert and 💤 tag if an item hasn't been eaten. Dismissing resets daily — alerts repeat every day until you eat it.</div>
-    <div class="settings-row">
-      <div><div class="settings-label">First reminder after</div><div class="settings-sublabel">Days since last eaten (or prepped)</div></div>
-      <div style="display:flex;align-items:center;gap:6px">
-        <input class="settings-input" id="s-fgt" type="number" value="${s.forgottenDays}" min="1" max="60" />
-        <span style="font-size:12px;color:var(--brown-light)">days</span>
-      </div>
-    </div>
-  </div>
-  <button class="btn-primary btn-full" id="btn-save-settings" style="padding:14px;margin-bottom:28px">Save Settings</button>
-  <div class="settings-block">
-    <div class="settings-block-title">Data Backup</div>
-    <div class="settings-block-sub">Export your stock and history as JSON. Import to restore from a backup.</div>
-    <div class="settings-row">
-      <div><div class="settings-label">Export data</div><div class="settings-sublabel">Download JSON backup</div></div>
-      <button class="btn-secondary btn-sm" id="btn-export">Export</button>
-    </div>
-    <div class="settings-row">
-      <div><div class="settings-label">Import data</div><div class="settings-sublabel">Restore from backup</div></div>
-      <label class="btn-secondary btn-sm" style="cursor:pointer">Import <input type="file" id="btn-import" accept=".json" style="display:none" /></label>
-    </div>
-  </div>`;
+var s=S.settings;
+var h=’<div class="page-title">Settings</div>’;
+h+=’<div class="settings-block"><div class="settings-block-title">Stock Alerts</div><div class="settings-block-sub">Control when warnings appear on your items</div>’;
+h+=’<div class="settings-row"><div><div class="settings-label">Low stock warning</div><div class="settings-sublabel">Warn when portions ≤ this number</div></div><input class="settings-input" id="s-low" type="number" value="'+s.lowStockThreshold+'" min="1" max="20" /></div>’;
+h+=’<div class="settings-row"><div><div class="settings-label">Default expiry (days)</div><div class="settings-sublabel">Applied when no per-item expiry is set</div></div><input class="settings-input" id="s-exp" type="number" value="'+s.expiryDays+'" min="1" max="30" /></div></div>’;
+h+=’<div class="settings-block"><div class="settings-block-title">Forgotten Item Reminder</div><div class="settings-block-sub">Alerts repeat daily until you eat the item.</div>’;
+h+=’<div class="settings-row"><div><div class="settings-label">First reminder after</div><div class="settings-sublabel">Days since last eaten (or prepped)</div></div><div style="display:flex;align-items:center;gap:6px"><input class="settings-input" id="s-fgt" type="number" value="'+s.forgottenDays+'" min="1" max="60" /><span style="font-size:12px;color:var(--brown-light)">days</span></div></div></div>’;
+h+=’<button class="btn-primary btn-full" id="btn-save-settings" style="padding:14px;margin-bottom:28px">Save Settings</button>’;
+h+=’<div class="settings-block"><div class="settings-block-title">Data Backup</div><div class="settings-block-sub">Export your stock and history as JSON.</div>’;
+h+=’<div class="settings-row"><div><div class="settings-label">Export data</div><div class="settings-sublabel">Download JSON backup</div></div><button class="btn-secondary btn-sm" id="btn-export">Export</button></div>’;
+h+=’<div class="settings-row"><div><div class="settings-label">Import data</div><div class="settings-sublabel">Restore from backup</div></div><label class="btn-secondary btn-sm" style="cursor:pointer">Import <input type="file" id="btn-import" accept=".json" style="display:none" /></label></div></div>’;
+return h;
 }
 
 function renderModal() {
-const m=S.modal,it=m.item;
+var m=S.modal, it=m.item;
+var h=’’;
 if(m.type===‘log’){
-const n=S.logPortions;
-return `<div class="modal-overlay" id="modal-overlay"><div class="modal-sheet"> <div class="modal-title">Log: ${it.name}</div> <div class="modal-sub">${it.portions} portion${it.portions!==1?'s':''} available</div> <div class="stepper"> <button class="stepper-btn" id="step-down">−</button> <div class="stepper-val">${n}</div> <button class="stepper-btn" id="step-up">+</button> </div> ${it.macros?.cal?`<div class="macro-preview">~${Math.round(it.macros.cal*n)} cal · ${Math.round(it.macros.protein*n)}g protein · ${Math.round(it.macros.carbs*n)}g carbs · ${Math.round(it.macros.fat*n)}g fat</div>`:''} <div style="display:flex;gap:10px;margin-top:16px"> <button class="btn-secondary btn-flex" id="modal-cancel">Cancel</button> <button class="btn-primary btn-flex" id="modal-confirm">Log It</button> </div> </div></div>`;
+var n=S.logPortions;
+h=’<div class="modal-overlay" id="modal-overlay"><div class="modal-sheet">’;
+h+=’<div class="modal-title">Log: ‘+it.name+’</div>’;
+h+=’<div class="modal-sub">’+it.portions+’ portion’+(it.portions!==1?‘s’:’’)+’ available</div>’;
+h+=’<div class="stepper"><button class="stepper-btn" id="step-down">−</button><div class="stepper-val">’+n+’</div><button class="stepper-btn" id="step-up">+</button></div>’;
+if(it.macros&&it.macros.cal) h+=’<div class="macro-preview">~’+Math.round(it.macros.cal*n)+’ cal · ’+Math.round(it.macros.protein*n)+‘g protein · ‘+Math.round(it.macros.carbs*n)+’g carbs · ’+Math.round(it.macros.fat*n)+‘g fat</div>’;
+h+=’<div style="display:flex;gap:10px;margin-top:16px"><button class="btn-secondary btn-flex" id="modal-cancel">Cancel</button><button class="btn-primary btn-flex" id="modal-confirm">Log It</button></div>’;
+h+=’</div></div>’;
+} else if(m.type===‘confirm-remove’){
+h=’<div class="modal-overlay" id="modal-overlay"><div class="modal-sheet">’;
+h+=’<div class="modal-title">Remove item?</div><div class="modal-sub" style="margin-bottom:20px">"’+it.name+’" will be removed entirely. This can't be undone.</div>’;
+h+=’<div style="display:flex;gap:10px"><button class="btn-secondary btn-flex" id="modal-cancel">Cancel</button><button class="btn-primary btn-flex" id="modal-confirm" style="background:#b85c38">Remove</button></div>’;
+h+=’</div></div>’;
+} else if(m.type===‘edit’){
+var f=S.editForm;
+h=’<div class="modal-overlay" id="modal-overlay"><div class="modal-sheet" style="max-height:85vh;overflow-y:auto">’;
+h+=’<div class="modal-title" style="margin-bottom:14px">Edit: ‘+it.name+’</div>’;
+h+=’<label class="form-label">Name</label><input class="form-input" id="e-name" value="'+f.name+'" />’;
+h+=’<label class="form-label">Category</label><select class="form-input" id="e-cat">’;
+CATS.filter(function(c){return c!==‘All’;}).forEach(function(c){h+=’<option’+(f.category===c?’ selected’:’’)+’>’+c+’</option>’;});
+h+=’</select>’;
+h+=’<label class="form-label">Expires after (days)</label><input class="form-input" id="e-expiry" type="number" value="'+f.expiryDays+'" placeholder="e.g. 5" min="1" />’;
+h+=’<div style="font-family:\'Playfair Display\',serif;font-size:14px;margin:16px 0 2px;color:#5a3e2a">Macros per portion</div>’;
+h+=’<div class="form-grid-2">’;
+h+=’<div><label class="form-label">Calories</label><input class="form-input" id="e-cal" type="number" value="'+f.cal+'" placeholder="0" /></div>’;
+h+=’<div><label class="form-label">Protein (g)</label><input class="form-input" id="e-protein" type="number" value="'+f.protein+'" placeholder="0" /></div>’;
+h+=’<div><label class="form-label">Carbs (g)</label><input class="form-input" id="e-carbs" type="number" value="'+f.carbs+'" placeholder="0" /></div>’;
+h+=’<div><label class="form-label">Fat (g)</label><input class="form-input" id="e-fat" type="number" value="'+f.fat+'" placeholder="0" /></div>’;
+h+=’</div>’;
+h+=’<label class="form-label">Notes</label><input class="form-input" id="e-notes" value="'+f.notes+'" placeholder="e.g. made with thighs" />’;
+h+=’<div style="display:flex;gap:10px;margin-top:20px"><button class="btn-secondary btn-flex" id="modal-cancel">Cancel</button><button class="btn-primary btn-flex" id="modal-confirm">Save Changes</button></div>’;
+h+=’</div></div>’;
+} else if(m.type===‘waste’){
+var wn=S.wastePortions;
+h=’<div class="modal-overlay" id="modal-overlay"><div class="modal-sheet">’;
+h+=’<div class="modal-title">Waste: ‘+it.name+’</div>’;
+h+=’<div class="modal-sub">’+it.portions+’ portion’+(it.portions!==1?‘s’:’’)+’ in stock · wasting all removes the item</div>’;
+h+=’<div class="stepper"><button class="stepper-btn" id="step-down">−</button><div class="stepper-val">’+wn+’</div><button class="stepper-btn" id="step-up">+</button></div>’;
+h+=’<div style="display:flex;gap:10px;margin-top:16px"><button class="btn-secondary btn-flex" id="modal-cancel">Cancel</button><button class="btn-primary btn-flex" id="modal-confirm" style="background:#b85c38">Mark as Wasted</button></div>’;
+h+=’</div></div>’;
+} else if(m.type===‘restock’){
+h=’<div class="modal-overlay" id="modal-overlay"><div class="modal-sheet">’;
+h+=’<div class="modal-title">Restock: ‘+it.name+’</div>’;
+h+=’<div class="modal-sub">Currently ‘+it.portions+’ portion’+(it.portions!==1?‘s’:’’)+’ remaining</div>’;
+h+=’<label class="form-label">Portions prepped</label><input class="form-input" id="restock-input" type="number" value="'+S.restockPortions+'" placeholder="e.g. 8" min="1" inputmode="numeric" />’;
+h+=’<div style="display:flex;gap:10px;margin-top:16px"><button class="btn-secondary btn-flex" id="modal-cancel">Cancel</button><button class="btn-primary btn-flex" id="modal-confirm">Add Stock</button></div>’;
+h+=’</div></div>’;
 }
-if(m.type===‘confirm-remove’){
-return `<div class="modal-overlay" id="modal-overlay"><div class="modal-sheet"> <div class="modal-title">Remove item?</div> <div class="modal-sub" style="margin-bottom:20px">"${it.name}" will be removed from stock entirely. This can't be undone.</div> <div style="display:flex;gap:10px"> <button class="btn-secondary btn-flex" id="modal-cancel">Cancel</button> <button class="btn-primary btn-flex" id="modal-confirm" style="background:#b85c38">Remove</button> </div> </div></div>`;
-}
-if(m.type===‘edit’){
-const f=S.editForm;
-return `<div class="modal-overlay" id="modal-overlay"><div class="modal-sheet" style="max-height:85vh;overflow-y:auto"> <div class="modal-title" style="margin-bottom:14px">Edit: ${it.name}</div> <label class="form-label">Name</label> <input class="form-input" id="e-name" value="${f.name}" /> <label class="form-label">Category</label> <select class="form-input" id="e-cat">${CATS.filter(c=>c!=='All').map(c=>`<option${f.category===c?’ selected’:’’}>${c}</option>`).join('')}</select> <label class="form-label">Expires after (days)</label> <input class="form-input" id="e-expiry" type="number" value="${f.expiryDays}" placeholder="e.g. 5" min="1" /> <div style="font-family:'Playfair Display',serif;font-size:14px;margin:16px 0 2px;color:#5a3e2a">Macros per portion</div> <div class="form-grid-2"> <div><label class="form-label">Calories</label><input class="form-input" id="e-cal" type="number" value="${f.cal}" placeholder="0" /></div> <div><label class="form-label">Protein (g)</label><input class="form-input" id="e-protein" type="number" value="${f.protein}" placeholder="0" /></div> <div><label class="form-label">Carbs (g)</label><input class="form-input" id="e-carbs" type="number" value="${f.carbs}" placeholder="0" /></div> <div><label class="form-label">Fat (g)</label><input class="form-input" id="e-fat" type="number" value="${f.fat}" placeholder="0" /></div> </div> <label class="form-label">Notes</label> <input class="form-input" id="e-notes" value="${f.notes}" placeholder="e.g. made with thighs" /> <div style="display:flex;gap:10px;margin-top:20px"> <button class="btn-secondary btn-flex" id="modal-cancel">Cancel</button> <button class="btn-primary btn-flex" id="modal-confirm">Save Changes</button> </div> </div></div>`;
-}
-if(m.type===‘waste’){
-const n=S.wastePortions;
-return `<div class="modal-overlay" id="modal-overlay"><div class="modal-sheet"> <div class="modal-title">Waste: ${it.name}</div> <div class="modal-sub">${it.portions} portion${it.portions!==1?'s':''} in stock · wasting all removes the item</div> <div class="stepper"> <button class="stepper-btn" id="step-down">−</button> <div class="stepper-val">${n}</div> <button class="stepper-btn" id="step-up">+</button> </div> <div style="display:flex;gap:10px;margin-top:16px"> <button class="btn-secondary btn-flex" id="modal-cancel">Cancel</button> <button class="btn-primary btn-flex" id="modal-confirm" style="background:#b85c38">Mark as Wasted</button> </div> </div></div>`;
-}
-if(m.type===‘restock’){
-return `<div class="modal-overlay" id="modal-overlay"><div class="modal-sheet"> <div class="modal-title">Restock: ${it.name}</div> <div class="modal-sub">Currently ${it.portions} portion${it.portions!==1?'s':''} remaining</div> <label class="form-label">Portions prepped</label> <input class="form-input" id="restock-input" type="number" value="${S.restockPortions}" placeholder="e.g. 8" min="1" inputmode="numeric" /> <div style="display:flex;gap:10px;margin-top:16px"> <button class="btn-secondary btn-flex" id="modal-cancel">Cancel</button> <button class="btn-primary btn-flex" id="modal-confirm">Add Stock</button> </div> </div></div>`;
-}
+return h;
 }
 
 function attachEvents() {
-const on=(sel,ev,fn)=>document.querySelectorAll(sel).forEach(el=>el.addEventListener(ev,fn));
-on(’[data-nav]’,‘click’,e=>{ S.view=e.currentTarget.dataset.nav; render(); });
-on(’[data-filter]’,‘click’,e=>{ S.filterCat=e.currentTarget.dataset.filter; render(); });
-on(’[data-expand]’,‘click’,e=>{ S.expandedId=S.expandedId===e.currentTarget.dataset.expand?null:e.currentTarget.dataset.expand; render(); });
-on(’[data-log]’,‘click’,e=>{ e.stopPropagation(); const it=S.items.find(x=>x.id===e.currentTarget.dataset.log); if(it&&it.portions>0){S.modal={type:‘log’,item:it};S.logPortions=1;render();} });
-on(’[data-restock]’,‘click’,e=>{ e.stopPropagation(); const it=S.items.find(x=>x.id===e.currentTarget.dataset.restock); if(it){S.modal={type:‘restock’,item:it};S.restockPortions=’’;render();} });
-on(’[data-waste]’,‘click’,e=>{ e.stopPropagation(); const it=S.items.find(x=>x.id===e.currentTarget.dataset.waste); if(it&&it.portions>0){S.modal={type:‘waste’,item:it};S.wastePortions=1;render();} });
-on(’[data-edit]’,‘click’,e=>{ e.stopPropagation(); openEdit(e.currentTarget.dataset.edit); });
-on(’[data-confirm-remove]’,‘click’,e=>{ e.stopPropagation(); const it=S.items.find(x=>x.id===e.currentTarget.dataset.confirmRemove); if(it){S.modal={type:‘confirm-remove’,item:it};render();} });
-on(’[data-dismiss]’,‘click’,e=>{ e.stopPropagation(); dismissAlert(e.currentTarget.dataset.dismiss); });
+function on(sel,ev,fn){ document.querySelectorAll(sel).forEach(function(el){el.addEventListener(ev,fn);}); }
+on(’[data-nav]’,‘click’,function(e){ S.view=e.currentTarget.dataset.nav; render(); });
+on(’[data-filter]’,‘click’,function(e){ S.filterCat=e.currentTarget.dataset.filter; render(); });
+on(’[data-expand]’,‘click’,function(e){ S.expandedId=S.expandedId===e.currentTarget.dataset.expand?null:e.currentTarget.dataset.expand; render(); });
+on(’[data-log]’,‘click’,function(e){ e.stopPropagation(); var it=S.items.filter(function(x){return x.id===e.currentTarget.dataset.log;})[0]; if(it&&it.portions>0){S.modal={type:‘log’,item:it};S.logPortions=1;render();} });
+on(’[data-restock]’,‘click’,function(e){ e.stopPropagation(); var it=S.items.filter(function(x){return x.id===e.currentTarget.dataset.restock;})[0]; if(it){S.modal={type:‘restock’,item:it};S.restockPortions=’’;render();} });
+on(’[data-waste]’,‘click’,function(e){ e.stopPropagation(); var it=S.items.filter(function(x){return x.id===e.currentTarget.dataset.waste;})[0]; if(it&&it.portions>0){S.modal={type:‘waste’,item:it};S.wastePortions=1;render();} });
+on(’[data-edit]’,‘click’,function(e){ e.stopPropagation(); openEdit(e.currentTarget.dataset.edit); });
+on(’[data-confirm-remove]’,‘click’,function(e){ e.stopPropagation(); var id=e.currentTarget.dataset.confirmRemove; var it=S.items.filter(function(x){return x.id===id;})[0]; if(it){S.modal={type:‘confirm-remove’,item:it};render();} });
+on(’[data-dismiss]’,‘click’,function(e){ e.stopPropagation(); dismissAlert(e.currentTarget.dataset.dismiss); });
 
-const btnAdd=document.getElementById(‘btn-add-item’);
-if(btnAdd) btnAdd.addEventListener(‘click’,()=>{
-const g=id=>document.getElementById(id)?.value||’’;
-S.form={name:g(‘f-name’),category:g(‘f-cat’)||‘Protein’,portions:g(‘f-portions’),expiryDays:g(‘f-expiry’),
-cal:g(‘f-cal’),protein:g(‘f-protein’),carbs:g(‘f-carbs’),fat:g(‘f-fat’),notes:g(‘f-notes’)};
+var btnAdd=document.getElementById(‘btn-add-item’);
+if(btnAdd) btnAdd.addEventListener(‘click’,function(){
+function g(id){var e=document.getElementById(id); return e?e.value:’’;}
+S.form={name:g(‘f-name’),category:g(‘f-cat’)||‘Protein’,portions:g(‘f-portions’),expiryDays:g(‘f-expiry’),cal:g(‘f-cal’),protein:g(‘f-protein’),carbs:g(‘f-carbs’),fat:g(‘f-fat’),notes:g(‘f-notes’)};
 addItem();
 });
 
-const btnSave=document.getElementById(‘btn-save-settings’);
+var btnSave=document.getElementById(‘btn-save-settings’);
 if(btnSave) btnSave.addEventListener(‘click’,saveSettings);
-const btnExp=document.getElementById(‘btn-export’);
+var btnExp=document.getElementById(‘btn-export’);
 if(btnExp) btnExp.addEventListener(‘click’,exportData);
-const btnImp=document.getElementById(‘btn-import’);
-if(btnImp) btnImp.addEventListener(‘change’,e=>{ if(e.target.files[0]) importData(e.target.files[0]); });
+var btnImp=document.getElementById(‘btn-import’);
+if(btnImp) btnImp.addEventListener(‘change’,function(e){ if(e.target.files[0]) importData(e.target.files[0]); });
 
-const cancel=document.getElementById(‘modal-cancel’);
-if(cancel) cancel.addEventListener(‘click’,()=>{ S.modal=null; render(); });
-const overlay=document.getElementById(‘modal-overlay’);
-if(overlay) overlay.addEventListener(‘click’,e=>{ if(e.target===overlay){S.modal=null;render();} });
+var cancel=document.getElementById(‘modal-cancel’);
+if(cancel) cancel.addEventListener(‘click’,function(){ S.modal=null; render(); });
+var overlay=document.getElementById(‘modal-overlay’);
+if(overlay) overlay.addEventListener(‘click’,function(e){ if(e.target===overlay){S.modal=null;render();} });
 
-const conf=document.getElementById(‘modal-confirm’);
-if(conf) conf.addEventListener(‘click’,()=>{
-if(S.modal?.type===‘log’) logMeal();
-else if(S.modal?.type===‘restock’){ S.restockPortions=document.getElementById(‘restock-input’)?.value||’’; restockItem(); }
-else if(S.modal?.type===‘waste’) wastePortions();
-else if(S.modal?.type===‘confirm-remove’) removeItem(S.modal.item.id);
-else if(S.modal?.type===‘edit’){
-const g=id=>document.getElementById(id)?.value||’’;
-S.editForm={…S.editForm,name:g(‘e-name’),category:g(‘e-cat’),expiryDays:g(‘e-expiry’),
-cal:g(‘e-cal’),protein:g(‘e-protein’),carbs:g(‘e-carbs’),fat:g(‘e-fat’),notes:g(‘e-notes’)};
+var conf=document.getElementById(‘modal-confirm’);
+if(conf) conf.addEventListener(‘click’,function(){
+if(S.modal&&S.modal.type===‘log’) logMeal();
+else if(S.modal&&S.modal.type===‘restock’){ var ri=document.getElementById(‘restock-input’); S.restockPortions=ri?ri.value:’’; restockItem(); }
+else if(S.modal&&S.modal.type===‘waste’) wastePortions();
+else if(S.modal&&S.modal.type===‘confirm-remove’) removeItem(S.modal.item.id);
+else if(S.modal&&S.modal.type===‘edit’){
+function g(id){var e=document.getElementById(id); return e?e.value:’’;}
+S.editForm=objAssign(objAssign({},S.editForm),{name:g(‘e-name’),category:g(‘e-cat’),expiryDays:g(‘e-expiry’),cal:g(‘e-cal’),protein:g(‘e-protein’),carbs:g(‘e-carbs’),fat:g(‘e-fat’),notes:g(‘e-notes’)});
 saveEdit();
 }
 });
 
-const sd=document.getElementById(‘step-down’);
-if(sd) sd.addEventListener(‘click’,()=>{ if(S.modal?.type===‘waste’) S.wastePortions=Math.max(1,S.wastePortions-1); else S.logPortions=Math.max(1,S.logPortions-1); render(); });
-const su=document.getElementById(‘step-up’);
-if(su) su.addEventListener(‘click’,()=>{ if(S.modal?.type===‘waste’) S.wastePortions=Math.min(S.modal?.item?.portions||1,S.wastePortions+1); else S.logPortions=Math.min(S.modal?.item?.portions||1,S.logPortions+1); render(); });
+var sd=document.getElementById(‘step-down’);
+if(sd) sd.addEventListener(‘click’,function(){ if(S.modal&&S.modal.type===‘waste’) S.wastePortions=Math.max(1,S.wastePortions-1); else S.logPortions=Math.max(1,S.logPortions-1); render(); });
+var su=document.getElementById(‘step-up’);
+if(su) su.addEventListener(‘click’,function(){ if(S.modal&&S.modal.type===‘waste’) S.wastePortions=Math.min(S.modal.item.portions,S.wastePortions+1); else S.logPortions=Math.min(S.modal.item.portions,S.logPortions+1); render(); });
+}
+
+// Init - no async, plain XHR
+function init() {
+document.getElementById(‘app’).innerHTML = ‘<div class="loading-screen"><div class="spinner"></div><div class="loading-title">PrepMacros</div><div class="loading-sub">Loading your stock…</div></div>’;
+localLoad();
+S.syncStatus=‘syncing’; S.syncMsg=‘Loading\u2026’;
+sbGet(function(err, rows) {
+if(!err && rows && rows.length>0) {
+var r=rows[0];
+S.items=r.items||[];
+S.history=r.history||[];
+S.settings=objAssign(objAssign({},DEFAULTS),r.settings||{});
+S.dismissedAlerts=r.dismissed_alerts||{};
+localSave();
+S.syncStatus=‘synced’; S.syncMsg=‘Saved to cloud’;
+} else {
+S.syncStatus=‘error’; S.syncMsg=err?’Sync error: ’+err:‘No data yet’;
+}
+render();
+});
 }
 
 init();
