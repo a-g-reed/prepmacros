@@ -11,7 +11,31 @@ body { background: #f5efe6; margin: 0; font-family: sans-serif; }
 <body>
 <div id="app">Loading...</div>
 <script>
-document.getElementById('app').innerHTML = '<h1 style="color:#3d2b1a">PrepMacros</h1><p>JS is running</p>';
-</script>
-</body>
-</html>
+window.onerror = function(msg, src, line) {
+  document.getElementById('app').innerHTML = '<p style="color:red"><b>Error line ' + line + ':</b><br>' + msg + '</p>';
+  return true;
+};
+
+var CATS = ['All','Protein','Carbs','Veg','Snack','Dessert','Creami Base','Other'];
+var DEFAULTS = { lowStockThreshold:3, expiryDays:5, forgottenDays:14 };
+
+function objAssign(target, source) {
+  for (var k in source) { if (source.hasOwnProperty(k)) target[k] = source[k]; }
+  return target;
+}
+
+var S = {
+  items:[], history:[], settings:objAssign({},DEFAULTS), dismissedAlerts:{},
+  view:'stock', filterCat:'All', expandedId:null,
+  modal:null, logPortions:1, restockPortions:'', wastePortions:1,
+  editForm:null, syncStatus:'syncing', syncMsg:'Loading...',
+  form:{ name:'',category:'Protein',portions:'',expiryDays:'',cal:'',protein:'',carbs:'',fat:'',notes:'' }
+};
+
+function localLoad() {
+  try {
+    var r = localStorage.getItem('prepmacros-v2');
+    if (r) {
+      var p = JSON.parse(r);
+      S.items = p.items || [];
+      S.history = p.history ||
