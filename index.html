@@ -267,7 +267,13 @@ S.syncStatus = ‘synced’;
 S.syncStatus = ‘error’;
 if (!S._debugMsg) S._debugMsg = ’Init error: ’ + e.message;
 }
+
+// Always render regardless of sync outcome
+try {
 render();
+} catch(e) {
+document.getElementById(‘app’).innerHTML = ` <div class="loading-screen"> <div class="loading-title">PrepMacros</div> <div class="loading-sub" style="color:#b85c38">Render error: ${e.message}</div> </div>`;
+}
 }
 
 // –– Helpers ––
