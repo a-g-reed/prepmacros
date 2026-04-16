@@ -143,11 +143,16 @@
 <body>
 <div id="app"></div>
 <script>
-var SB_URL = 'https://zbeuowizrnkotijtzoeh.supabase.co';
-var SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpiZXVvd2l6cm5rb3RpanR6b2VoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyODM4MDIsImV4cCI6MjA5MTg1OTgwMn0.c8_qca_JiWE0GAnuHW5RMtGgER7ywGO6rHifcCg1frI';
-var SB_TABLE = 'prepmacros_data';
-var LOCAL_KEY = 'prepmacros-v2';
-var CATS = ['All','Protein','Carbs','Veg','Snack','Dessert','Creami Base','Other'];
+window.onerror=function(msg,src,line,col,err){
+  document.getElementById("app").innerHTML="<div style='padding:20px;font-family:monospace;font-size:13px;color:#b85c38;background:#fff8f0;min-height:100vh'><strong>JS Error:</strong><br>"+msg+"<br><br>Line: "+line+"<br>Col: "+col+"<br><br>"+(err?err.stack:"no stack")+"</div>";
+  return true;
+};
+
+var SB_URL = ‘https://zbeuowizrnkotijtzoeh.supabase.co’;
+var SB_KEY = ‘eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpiZXVvd2l6cm5rb3RpanR6b2VoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyODM4MDIsImV4cCI6MjA5MTg1OTgwMn0.c8_qca_JiWE0GAnuHW5RMtGgER7ywGO6rHifcCg1frI’;
+var SB_TABLE = ‘prepmacros_data’;
+var LOCAL_KEY = ‘prepmacros-v2’;
+var CATS = [‘All’,‘Protein’,‘Carbs’,‘Veg’,‘Snack’,‘Dessert’,‘Creami Base’,‘Other’];
 var DEFAULTS = { lowStockThreshold:3, expiryDays:5, forgottenDays:14 };
 
 var S = {
