@@ -1,88 +1,652 @@
 <!DOCTYPE html>
-<html>
+
+<html lang="en">
 <head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<style>
-body{margin:0;font-family:-apple-system,sans-serif;background:#f5efe6;color:#3d2b1a}
-#app{padding:16px}
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="PrepMacros" />
+  <meta name="theme-color" content="#3d2b1a" />
+  <title>PrepMacros Stock Tracker</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { min-height: 100vh; background: #f5efe6; font-family: -apple-system, sans-serif; color: #3d2b1a; -webkit-font-smoothing: antialiased; }
+    button { -webkit-tap-highlight-color: transparent; cursor: pointer; font-family: -apple-system, sans-serif; }
+    input, select { font-family: -apple-system, sans-serif; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+    @keyframes slideUp { from { transform:translateY(30px);opacity:0; } to { transform:translateY(0);opacity:1; } }
+    @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+  </style>
 </head>
 <body>
-<div id="app">Loading...</div>
+<div id="app" style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+  <div style="width:40px;height:40px;border:3px solid #e0d0ba;border-top-color:#c8a96e;border-radius:50%;animation:spin 0.8s linear infinite;"></div>
+  <div style="margin-top:16px;font-size:22px;font-weight:700;color:#3d2b1a;">PrepMacros</div>
+  <div style="margin-top:6px;font-size:13px;color:#a08060;">Loading your stock&hellip;</div>
+</div>
+
 <script>
-window.onerror=function(msg,src,line,col,err){
-  document.getElementById('app').innerHTML='<pre style="color:red;font-size:11px;white-space:pre-wrap">ERROR:\n'+msg+'\nLine:'+line+'\n'+(err?err.stack:'')+'</pre>';
-  return true;
+// ── Config ──────────────────────────────────────────────────────────────────
+var SB_URL = 'https://zbeuowizrnkotijtzoeh.supabase.co';
+var SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpiZXVvd2l6cm5rb3RpanR6b2VoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyODM4MDIsImV4cCI6MjA5MTg1OTgwMn0.c8_qca_JiWE0GAnuHW5RMtGgER7ywGO6rHifcCg1frI';
+var LOCAL_KEY = 'prepmacros-v2';
+var CATS = ['All','Protein','Carbs','Veg','Snack','Dessert','Creami Base','Other'];
+var DEFAULTS = { lowStockThreshold:3, expiryDays:5, forgottenDays:14 };
+
+// ── State ────────────────────────────────────────────────────────────────────
+var S = {
+  items:[], history:[], settings:{lowStockThreshold:3,expiryDays:5,forgottenDays:14},
+  dismissedAlerts:{}, view:'stock', filterCat:'All', expandedId:null,
+  modal:null, logPortions:1, restockPortions:1, wastePortions:1, editForm:null,
+  syncStatus:'syncing', syncMsg:'Loading\u2026',
+  form:{name:'',category:'Protein',portions:'',expiryDays:'',cal:'',protein:'',carbs:'',fat:'',notes:''}
 };
 
-var CATS=['All','Protein','Carbs','Veg','Snack','Dessert','Creami Base','Other'];
-var DEFAULTS={lowStockThreshold:3,expiryDays:5,forgottenDays:14};
-var S={items:[],history:[],settings:{lowStockThreshold:3,expiryDays:5,forgottenDays:14},dismissedAlerts:{},view:'stock',filterCat:'All',expandedId:null,modal:null,logPortions:1,restockPortions:'',wastePortions:1,editForm:null,syncStatus:'synced',syncMsg:'Saved to cloud',form:{name:'',category:'Protein',portions:'',expiryDays:'',cal:'',protein:'',carbs:'',fat:'',notes:''}};
+// ── Helpers ──────────────────────────────────────────────────────────────────
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function daysSince(d){ if(!d)return null; return Math.floor((Date.now()-new Date(d))/86400000); }
+function daysAgo(d){ var n=daysSince(d); if(n===null)return null; if(n===0)return'today'; if(n===1)return'yesterday'; return n+'d ago'; }
+function todayStr(){ return new Date().toISOString().split('T')[0]; }
+function barColor(p){ return p>0.5?'#7a9e7e':p>0.25?'#c4a84b':'#b85c38'; }
+function isDismissedToday(k){ return S.dismissedAlerts[k]===todayStr(); }
+function totP(){ return S.items.reduce(function(s,it){return s+it.portions;},0); }
+function lowC(){ return S.items.filter(function(it){return it.portions>0&&it.portions<=S.settings.lowStockThreshold;}).length; }
+function outC(){ return S.items.filter(function(it){return it.portions===0;}).length; }
+function ge(id){ return document.getElementById(id); }
 
-function objAssign(t,s){for(var k in s){if(s.hasOwnProperty(k))t[k]=s[k];}return t;}
-function daysSince(d){if(!d)return null;return Math.floor((Date.now()-new Date(d))/86400000);}
-function daysAgo(d){var n=daysSince(d);if(n===null)return null;if(n===0)return'today';if(n===1)return'yesterday';return n+'d ago';}
-function todayStr(){return new Date().toISOString().split('T')[0];}
-function barColor(p){return p>0.5?'#7a9e7e':p>0.25?'#c4a84b':'#b85c38';}
-function isDismissedToday(key){return S.dismissedAlerts[key]===todayStr();}
-function totP(){return S.items.reduce(function(s,it){return s+it.portions;},0);}
-function lowC(){return S.items.filter(function(it){return it.portions>0&&it.portions<=S.settings.lowStockThreshold;}).length;}
-function outC(){return S.items.filter(function(it){return it.portions===0;}).length;}
+function todayMacros(){
+  var t=todayStr(); var cal=0,pro=0,carb=0,fat=0,any=false;
+  S.history.filter(function(h){return h.type==='eat'&&h.date&&h.date.indexOf(t)===0;}).forEach(function(h){
+    var it=S.items.filter(function(x){return x.id===h.itemId;})[0];
+    if(it&&it.macros&&it.macros.cal){cal+=parseFloat(it.macros.cal)*h.portions;pro+=parseFloat(it.macros.protein||0)*h.portions;carb+=parseFloat(it.macros.carbs||0)*h.portions;fat+=parseFloat(it.macros.fat||0)*h.portions;any=true;}
+  });
+  return any?{cal:Math.round(cal),protein:Math.round(pro),carbs:Math.round(carb),fat:Math.round(fat)}:null;
+}
 
-document.getElementById('app').innerHTML='<p>Functions defined ok, trying renderHeader...</p>';
+function getAlerts(){
+  var alerts=[];
+  S.items.forEach(function(it){
+    if(it.portions===0)return;
+    var expDays=it.expiryDays!=null?it.expiryDays:S.settings.expiryDays;
+    var age=daysSince(it.prepDate);
+    if(expDays&&age!==null){
+      if(age>=expDays&&!isDismissedToday('exp-'+it.id)) alerts.push({key:'exp-'+it.id,type:'expired',item:it,msg:esc(it.name)+' may have expired',badge:age+'d old',col:'#b85c38'});
+      else if(age>=expDays-1&&age<expDays&&!isDismissedToday('expw-'+it.id)) alerts.push({key:'expw-'+it.id,type:'expiring',item:it,msg:esc(it.name)+' expires tomorrow',badge:'1d left',col:'#c4a84b'});
+    }
+    var sinceEat=daysSince(it.lastEaten||it.prepDate);
+    if(sinceEat!==null&&sinceEat>=S.settings.forgottenDays&&!isDismissedToday('fgt-'+it.id))
+      alerts.push({key:'fgt-'+it.id,type:'forgotten',item:it,msg:"Haven't eaten "+esc(it.name),badge:sinceEat+'d',col:'#6050a0'});
+  });
+  return alerts;
+}
 
-function renderHeader(){
-  var h='<div style="background:#3d2b1a;padding:12px 20px 10px;">';
-  h+='<div style="display:flex;justify-content:space-between;align-items:center;">';
-  h+='<div style="font-size:20px;color:#f0d9b5;">PrepMacros</div>';
-  h+='<div style="color:#c8a96e;font-size:14px;">'+totP()+' portions</div>';
-  h+='</div>';
-  h+='<div style="display:flex;gap:5px;padding:8px 0 10px;">';
-  var views=[['stock','Stock'],['add','Add'],['log','Log'],['history','Hist'],['settings','Settings']];
-  for(var i=0;i<views.length;i++){
-    var v=views[i];
-    h+='<button onclick="S.view=\''+v[0]+'\';doRender();" style="flex:1;padding:7px 2px;border-radius:8px;border:none;font-size:11px;cursor:pointer;background:'+(S.view===v[0]?'#c8a96e':'rgba(255,255,255,0.1)')+';color:'+(S.view===v[0]?'#3d2b1a':'#d4c4a8')+';">'+v[1]+'</button>';
+// ── Storage ───────────────────────────────────────────────────────────────────
+function localSave(){
+  try{localStorage.setItem(LOCAL_KEY,JSON.stringify({items:S.items,history:S.history,settings:S.settings,dismissedAlerts:S.dismissedAlerts}));}catch(e){}
+}
+function localLoad(){
+  try{var r=localStorage.getItem(LOCAL_KEY);if(r){var p=JSON.parse(r);S.items=p.items||[];S.history=p.history||[];if(p.settings)for(var k in p.settings)S.settings[k]=p.settings[k];S.dismissedAlerts=p.dismissedAlerts||{};}}catch(e){}
+}
+
+var saveTimer=null;
+function save(){
+  localSave();
+  S.syncStatus='syncing'; S.syncMsg='Syncing\u2026';
+  updateSyncBar();
+  clearTimeout(saveTimer);
+  saveTimer=setTimeout(function(){
+    fetch(SB_URL+'/rest/v1/prepmacros_data?id=eq.singleton',{
+      method:'PATCH',
+      headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({items:S.items,history:S.history,settings:S.settings,dismissed_alerts:S.dismissedAlerts,updated_at:new Date().toISOString()})
+    }).then(function(){S.syncStatus='synced';S.syncMsg='Saved to cloud';updateSyncBar();})
+      .catch(function(e){S.syncStatus='error';S.syncMsg='Offline \u2013 saved locally';updateSyncBar();});
+  },800);
+}
+
+function updateSyncBar(){
+  var bar=ge('sync-bar');
+  if(!bar)return;
+  var dotColor=S.syncStatus==='synced'?'#7a9e7e':S.syncStatus==='error'?'#b85c38':'#c8a96e';
+  var bgColor=S.syncStatus==='synced'?'rgba(122,158,126,0.15)':S.syncStatus==='error'?'rgba(184,92,56,0.15)':'rgba(200,169,110,0.2)';
+  bar.style.background=bgColor;
+  bar.innerHTML='<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:'+dotColor+';margin-right:6px;vertical-align:middle;'+(S.syncStatus==='syncing'?'animation:pulse 1s infinite;':'')+'"></span><span style="font-size:11px;color:'+dotColor+';">'+S.syncMsg+'</span>';
+}
+
+// ── Actions ───────────────────────────────────────────────────────────────────
+function addItem(){
+  var f=S.form;
+  if(!f.name.trim()||!f.portions)return;
+  var item={id:Date.now().toString(),name:f.name.trim(),category:f.category,portions:parseInt(f.portions),totalPortions:parseInt(f.portions),
+    expiryDays:f.expiryDays?parseInt(f.expiryDays):null,
+    macros:{cal:f.cal,protein:f.protein,carbs:f.carbs,fat:f.fat},notes:f.notes,prepDate:new Date().toISOString(),lastEaten:null};
+  S.items.push(item);
+  S.history.unshift({type:'prep',itemId:item.id,itemName:item.name,portions:item.portions,date:new Date().toISOString()});
+  save(); S.form={name:'',category:'Protein',portions:'',expiryDays:'',cal:'',protein:'',carbs:'',fat:'',notes:''}; S.view='stock'; render();
+}
+
+function restockItem(){
+  var n=parseInt(S.restockPortions); if(!n||!S.modal)return;
+  var id=S.modal.item.id;
+  S.items=S.items.map(function(it){return it.id===id?{id:it.id,name:it.name,category:it.category,portions:it.portions+n,totalPortions:it.totalPortions+n,expiryDays:it.expiryDays,macros:it.macros,notes:it.notes,prepDate:new Date().toISOString(),lastEaten:it.lastEaten}:it;});
+  S.history.unshift({type:'prep',itemId:id,itemName:S.modal.item.name,portions:n,date:new Date().toISOString()});
+  ['exp','expw','fgt'].forEach(function(p){delete S.dismissedAlerts[p+'-'+id];});
+  save(); S.modal=null; S.restockPortions=1; render();
+}
+
+function logMeal(){
+  if(!S.modal)return;
+  var n=Math.min(S.logPortions,S.modal.item.portions); var id=S.modal.item.id;
+  S.items=S.items.map(function(it){return it.id===id?{id:it.id,name:it.name,category:it.category,portions:Math.max(0,it.portions-n),totalPortions:it.totalPortions,expiryDays:it.expiryDays,macros:it.macros,notes:it.notes,prepDate:it.prepDate,lastEaten:new Date().toISOString()}:it;});
+  S.history.unshift({type:'eat',itemId:id,itemName:S.modal.item.name,portions:n,date:new Date().toISOString()});
+  delete S.dismissedAlerts['fgt-'+id];
+  save(); S.modal=null; S.logPortions=1; render();
+}
+
+function removeItem(id){
+  var it=S.items.filter(function(x){return x.id===id;})[0];
+  if(it)S.history.unshift({type:'deleted',itemId:id,itemName:it.name,portions:it.portions,date:new Date().toISOString()});
+  S.items=S.items.filter(function(x){return x.id!==id;}); S.modal=null; save(); render();
+}
+
+function openEdit(id){
+  var it=S.items.filter(function(x){return x.id===id;})[0]; if(!it)return;
+  S.editForm={id:id,name:it.name,category:it.category,expiryDays:it.expiryDays||'',
+    cal:(it.macros&&it.macros.cal)||'',protein:(it.macros&&it.macros.protein)||'',
+    carbs:(it.macros&&it.macros.carbs)||'',fat:(it.macros&&it.macros.fat)||'',notes:it.notes||''};
+  S.modal={type:'edit',item:it}; render();
+}
+
+function saveEdit(){
+  var f=S.editForm; if(!f)return;
+  S.items=S.items.map(function(it){
+    if(it.id!==f.id)return it;
+    return {id:it.id,name:f.name.trim()||it.name,category:f.category,portions:it.portions,totalPortions:it.totalPortions,
+      expiryDays:f.expiryDays?parseInt(f.expiryDays):null,macros:{cal:f.cal,protein:f.protein,carbs:f.carbs,fat:f.fat},
+      notes:f.notes,prepDate:it.prepDate,lastEaten:it.lastEaten};
+  });
+  save(); S.modal=null; S.editForm=null; render();
+}
+
+function wastePortions(){
+  if(!S.modal)return;
+  var n=Math.min(S.wastePortions,S.modal.item.portions); var id=S.modal.item.id;
+  var wasAll=S.modal.item.portions-n<=0;
+  S.items=S.items.map(function(it){return it.id===id?{id:it.id,name:it.name,category:it.category,portions:Math.max(0,it.portions-n),totalPortions:it.totalPortions,expiryDays:it.expiryDays,macros:it.macros,notes:it.notes,prepDate:it.prepDate,lastEaten:it.lastEaten}:it;});
+  S.history.unshift({type:'waste',itemId:id,itemName:S.modal.item.name,portions:n,date:new Date().toISOString()});
+  if(wasAll)S.items=S.items.filter(function(it){return it.id!==id;});
+  save(); S.modal=null; S.wastePortions=1; render();
+}
+
+function saveSettings(){
+  var g=function(id,fb){var e=ge(id);return e?parseInt(e.value)||fb:fb;};
+  S.settings.lowStockThreshold=g('s-low',3); S.settings.expiryDays=g('s-exp',5); S.settings.forgottenDays=g('s-fgt',14);
+  save(); render();
+}
+
+function exportData(){
+  var blob=new Blob([JSON.stringify({items:S.items,history:S.history,settings:S.settings},null,2)],{type:'application/json'});
+  var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='prepmacros-'+todayStr()+'.json'; a.click();
+}
+
+function importData(file){
+  var r=new FileReader(); r.onload=function(e){
+    try{var p=JSON.parse(e.target.result);
+      if(p.items){S.items=p.items;S.history=p.history||[];if(p.settings)for(var k in p.settings)S.settings[k]=p.settings[k];save();render();alert('Import successful!');}
+      else alert('Invalid file.');
+    }catch(ex){alert('Could not read file.');}
+  }; r.readAsText(file);
+}
+
+// ── Styles (reusable inline style strings) ────────────────────────────────────
+var cs = {
+  card: 'background:#fff8f0;border-radius:14px;border:1px solid #e0d0ba;overflow:hidden;margin-bottom:10px;',
+  cardExpired: 'background:#fff8f0;border-radius:14px;border:1.5px solid #b85c38;overflow:hidden;margin-bottom:10px;',
+  cardWarn: 'background:#fff8f0;border-radius:14px;border:1.5px solid #c4a84b;overflow:hidden;margin-bottom:10px;',
+  btnPrimary: 'background:#3d2b1a;color:#f0d9b5;border:none;border-radius:10px;padding:12px 16px;font-size:13px;font-weight:700;cursor:pointer;',
+  btnSecondary: 'background:transparent;color:#3d2b1a;border:1px solid #c8b89a;border-radius:10px;padding:12px 16px;font-size:13px;cursor:pointer;',
+  btnDanger: 'background:transparent;color:#b85c38;border:1px solid #b85c38;border-radius:10px;padding:8px 10px;font-size:13px;cursor:pointer;',
+  label: 'display:block;font-size:11px;color:#7a5c3a;margin-bottom:4px;margin-top:14px;text-transform:uppercase;letter-spacing:0.5px;font-weight:700;',
+  input: 'width:100%;padding:11px 14px;border-radius:10px;border:1px solid #d4c4a8;background:#fff8f0;font-size:15px;color:#3d2b1a;outline:none;-webkit-appearance:none;box-sizing:border-box;',
+  tag: 'border-radius:10px;padding:2px 8px;font-size:11px;',
+};
+
+// ── Render ────────────────────────────────────────────────────────────────────
+function render(){
+  var app=ge('app'); if(!app)return;
+  var safeTop='max(env(safe-area-inset-top),12px)';
+  var safeBot='calc(env(safe-area-inset-bottom) + 20px)';
+
+  var macros=todayMacros(); var alerts=getAlerts(); var low=lowC(); var out=outC();
+
+  // ── Header
+  var header='<div style="background:#3d2b1a;padding:'+safeTop+' 20px 0;position:sticky;top:0;z-index:100;">';
+
+  // Sync bar
+  var dotColor=S.syncStatus==='synced'?'#7a9e7e':S.syncStatus==='error'?'#b85c38':'#c8a96e';
+  var bgColor=S.syncStatus==='synced'?'rgba(122,158,126,0.15)':S.syncStatus==='error'?'rgba(184,92,56,0.15)':'rgba(200,169,110,0.2)';
+  header+='<div id="sync-bar" style="background:'+bgColor+';padding:3px 0;text-align:center;">';
+  header+='<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:'+dotColor+';margin-right:6px;vertical-align:middle;'+(S.syncStatus==='syncing'?'animation:pulse 1s infinite;':'')+'"></span>';
+  header+='<span style="font-size:11px;color:'+dotColor+';">'+S.syncMsg+'</span></div>';
+
+  // Title row
+  header+='<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0 8px;">';
+  header+='<div><div style="font-size:20px;font-weight:700;color:#f0d9b5;">PrepMacros</div><div style="font-size:10px;color:#c8a96e;letter-spacing:1.5px;text-transform:uppercase;">Stock Tracker</div></div>';
+  header+='<div style="display:flex;gap:6px;">';
+  header+='<div style="background:rgba(255,255,255,0.1);border-radius:20px;padding:4px 10px;text-align:center;"><div style="font-size:14px;font-weight:700;color:#c8a96e;">'+totP()+'</div><div style="font-size:9px;color:#c8b89a;text-transform:uppercase;">Portions</div></div>';
+  if(low)header+='<div style="background:rgba(255,255,255,0.1);border-radius:20px;padding:4px 10px;text-align:center;"><div style="font-size:14px;font-weight:700;color:#d4a843;">'+low+'</div><div style="font-size:9px;color:#c8b89a;text-transform:uppercase;">Low</div></div>';
+  if(out)header+='<div style="background:rgba(255,255,255,0.1);border-radius:20px;padding:4px 10px;text-align:center;"><div style="font-size:14px;font-weight:700;color:#b85c38;">'+out+'</div><div style="font-size:9px;color:#c8b89a;text-transform:uppercase;">Out</div></div>';
+  if(alerts.length)header+='<div style="background:rgba(255,255,255,0.1);border-radius:20px;padding:4px 10px;text-align:center;"><div style="font-size:14px;font-weight:700;color:#e0a030;">'+alerts.length+'</div><div style="font-size:9px;color:#c8b89a;text-transform:uppercase;">Alerts</div></div>';
+  header+='</div></div>';
+
+  // Today strip
+  if(macros){
+    header+='<div style="background:rgba(200,169,110,0.15);border-top:1px solid rgba(200,169,110,0.2);padding:8px 0;display:flex;gap:16px;overflow-x:auto;">';
+    header+='<span style="font-size:11px;color:#c8b89a;align-self:center;text-transform:uppercase;letter-spacing:0.5px;border-right:1px solid rgba(200,169,110,0.3);padding-right:14px;white-space:nowrap;">Today</span>';
+    var mm=[['Cal',macros.cal],['Protein',macros.protein+'g'],['Carbs',macros.carbs+'g'],['Fat',macros.fat+'g']];
+    mm.forEach(function(m){
+      header+='<div style="text-align:center;flex-shrink:0;"><div style="font-size:15px;font-weight:700;color:#f0d9b5;">'+m[1]+'</div><div style="font-size:9px;color:#c8b89a;text-transform:uppercase;">'+m[0]+'</div></div>';
+    });
+    header+='</div>';
   }
+
+  // Alerts banner
+  if(alerts.length){
+    header+='<div style="background:#fdf6e3;border-top:1px solid rgba(200,160,60,0.25);padding:6px 16px;">';
+    alerts.forEach(function(a){
+      header+='<div style="display:flex;align-items:center;padding:5px 0;border-bottom:1px solid rgba(0,0,0,0.05);">';
+      header+='<div style="flex:1;font-size:13px;color:#5a4010;">'+a.msg+'</div>';
+      header+='<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:'+a.col+'22;color:'+a.col+';margin-left:8px;">'+a.badge+'</span>';
+      header+='<button onclick="dismissAlert(\''+a.key+'\')" style="background:none;border:none;font-size:15px;color:#b09050;cursor:pointer;padding:0 2px 0 8px;">&#x2715;</button>';
+      header+='</div>';
+    });
+    header+='</div>';
+  }
+
+  // Nav
+  header+='<div style="display:flex;gap:5px;padding:8px 0 10px;">';
+  var navItems=[['stock','📦 Stock'],['add','+ Add'],['log','🍽 Log'],['history','📋 Hist'],['settings','⚙️']];
+  navItems.forEach(function(v){
+    var active=S.view===v[0];
+    header+='<button onclick="setView(\''+v[0]+'\')" style="flex:1;padding:7px 2px;border-radius:8px;border:none;font-size:11px;cursor:pointer;background:'+(active?'#c8a96e':'rgba(255,255,255,0.08)')+';color:'+(active?'#3d2b1a':'#d4c4a8')+';font-weight:'+(active?'700':'400')+';">'+v[1]+'</button>';
+  });
+  header+='</div></div>';
+
+  // ── Main content
+  var main='<div style="flex:1;overflow-y:auto;padding:16px 16px '+safeBot+';-webkit-overflow-scrolling:touch;">';
+  if(S.view==='stock') main+=renderStock();
+  else if(S.view==='add') main+=renderAdd();
+  else if(S.view==='log') main+=renderLog();
+  else if(S.view==='history') main+=renderHistory();
+  else if(S.view==='settings') main+=renderSettings();
+  main+='</div>';
+
+  // ── Modal
+  var modal=S.modal?renderModal():'';
+
+  app.style.cssText='min-height:100vh;display:flex;flex-direction:column;';
+  app.innerHTML=header+main+modal;
+}
+
+function setView(v){ S.view=v; render(); }
+function dismissAlert(key){ S.dismissedAlerts[key]=todayStr(); save(); render(); }
+function toggleExpand(id){ S.expandedId=S.expandedId===id?null:id; render(); }
+
+// ── Stock view
+function renderStock(){
+  var items=S.filterCat==='All'?S.items:S.items.filter(function(it){return it.category===S.filterCat;});
+
+  var h='<div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:14px;">';
+  CATS.forEach(function(c){
+    var active=S.filterCat===c;
+    h+='<button onclick="S.filterCat=\''+c+'\';render();" style="padding:5px 14px;border-radius:20px;white-space:nowrap;font-size:12px;border:'+(active?'none':'1px solid #e8ddd0')+';background:'+(active?'#3d2b1a':'transparent')+';color:'+(active?'#f0d9b5':'#7a5c3a')+';">'+c+'</button>';
+  });
+  h+='</div>';
+
+  if(!items.length){
+    h+='<div style="text-align:center;padding:48px 20px;color:#a08060;">';
+    h+='<div style="font-size:40px;margin-bottom:12px;">🥡</div>';
+    h+='<div style="font-size:18px;font-weight:700;margin-bottom:6px;color:#7a5c3a;">No items yet</div>';
+    h+='<div style="font-size:13px;">Tap &quot;+ Add&quot; to log your first prep batch</div></div>';
+    return h;
+  }
+
+  items.forEach(function(it){ h+=renderCard(it); });
+  return h;
+}
+
+function renderCard(it){
+  var pct=it.totalPortions>0?it.portions/it.totalPortions:0;
+  var exp=S.expandedId===it.id, oos=it.portions===0;
+  var isLow=it.portions>0&&it.portions<=S.settings.lowStockThreshold;
+  var expDays=it.expiryDays!=null?it.expiryDays:S.settings.expiryDays;
+  var age=daysSince(it.prepDate);
+  var isExp=!!(expDays&&age>=expDays), isExpW=!isExp&&!!(expDays&&age>=expDays-1);
+  var sinceEat=daysSince(it.lastEaten||it.prepDate), isFgt=sinceEat>=S.settings.forgottenDays;
+  var borderColor=isExp?'#b85c38':isExpW||isLow?'#c4a84b':'#e0d0ba';
+  var portColor=oos?'#b85c38':isLow?'#c4a84b':'#3d2b1a';
+
+  var h='<div style="background:#fff8f0;border-radius:14px;border:1.5px solid '+borderColor+';overflow:hidden;margin-bottom:10px;">';
+
+  // Header row (tappable)
+  h+='<div onclick="toggleExpand(\''+it.id+'\')" style="padding:14px 16px;cursor:pointer;">';
+  h+='<div style="display:flex;justify-content:space-between;align-items:flex-start;">';
+  h+='<div style="flex:1;min-width:0;">';
+  h+='<div style="font-weight:700;font-size:16px;">'+esc(it.name)+'</div>';
+  h+='<div style="font-size:11px;color:#a08060;margin-top:4px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;">';
+  h+='<span style="background:#f0e6d4;border-radius:10px;padding:2px 8px;color:#7a5c3a;">'+esc(it.category)+'</span>';
+  if(isExp) h+='<span style="background:#ffe8e0;border-radius:10px;padding:2px 8px;color:#8a2010;">⚠️ Expired</span>';
+  else if(isExpW) h+='<span style="background:#fff0cc;border-radius:10px;padding:2px 8px;color:#8a6010;">🕐 Exp. soon</span>';
+  else h+='<span>prepped '+(daysAgo(it.prepDate)||'—')+'</span>';
+  if(isLow&&!oos) h+='<span style="background:#fff0cc;border-radius:10px;padding:2px 8px;color:#8a6010;">⚡ Low</span>';
+  if(isFgt&&!oos) h+='<span style="background:#ece8f8;border-radius:10px;padding:2px 8px;color:#6050a0;">💤 Forgotten</span>';
+  if(it.lastEaten) h+='<span>eaten '+daysAgo(it.lastEaten)+'</span>';
+  h+='</div></div>';
+  h+='<div style="text-align:right;flex-shrink:0;margin-left:10px;">';
+  h+='<div style="font-size:24px;font-weight:700;line-height:1;color:'+portColor+';">'+it.portions+'</div>';
+  h+='<div style="font-size:10px;color:#a08060;">portions</div></div></div>';
+  // Progress bar
+  h+='<div style="background:#e8ddd0;border-radius:4px;height:5px;margin-top:10px;">';
+  h+='<div style="width:'+Math.max(2,pct*100)+'%;height:100%;border-radius:4px;background:'+barColor(pct)+';"></div></div>';
+  h+='</div>'; // end header
+
+  if(exp){
+    h+='<div style="padding:0 16px 14px;border-top:1px solid #f0e6d4;">';
+    if(it.macros&&it.macros.cal){
+      h+='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:12px 0;">';
+      [['Cal',it.macros.cal],['Protein',it.macros.protein+'g'],['Carbs',it.macros.carbs+'g'],['Fat',it.macros.fat+'g']].forEach(function(m){
+        h+='<div style="background:#f0e6d4;border-radius:8px;padding:6px 4px;text-align:center;">';
+        h+='<div style="font-size:13px;font-weight:700;">'+m[1]+'</div>';
+        h+='<div style="font-size:10px;color:#a08060;">'+m[0]+'</div></div>';
+      });
+      h+='</div>';
+    }
+    if(it.notes) h+='<div style="font-size:12px;color:#7a5c3a;margin-bottom:10px;font-style:italic;">&quot;'+esc(it.notes)+'&quot;</div>';
+    if(expDays) h+='<div style="font-size:12px;color:#a08060;margin-bottom:10px;">Expiry: '+expDays+' days &middot; '+(isExp?'<span style="color:#b85c38;font-weight:700;">Expired</span>':(expDays-age)+'d remaining')+'</div>';
+    h+='<div style="display:flex;gap:8px;">';
+    h+='<button onclick="openLogModal(\''+it.id+'\')" '+(oos?'disabled':'')+' style="'+cs.btnPrimary+'flex:1;opacity:'+(oos?0.4:1)+';">🍽 Eat</button>';
+    h+='<button onclick="openRestockModal(\''+it.id+'\')" style="'+cs.btnSecondary+'flex:1;">🥡 Restock</button>';
+    h+='<button onclick="openWasteModal(\''+it.id+'\')" '+(oos?'disabled':'')+' style="'+cs.btnSecondary+'flex:1;opacity:'+(oos?0.4:1)+';">🗑 Waste</button>';
+    h+='<button onclick="openEdit(\''+it.id+'\')" style="'+cs.btnSecondary+'padding:8px 10px;">✏️</button>';
+    h+='<button onclick="openRemoveModal(\''+it.id+'\')" style="'+cs.btnDanger+'">✕</button>';
+    h+='</div></div>';
+  }
+
+  h+='</div>';
+  return h;
+}
+
+function openLogModal(id){ var it=S.items.filter(function(x){return x.id===id;})[0]; if(it&&it.portions>0){S.modal={type:'log',item:it};S.logPortions=1;render();} }
+function openRestockModal(id){ var it=S.items.filter(function(x){return x.id===id;})[0]; if(it){S.modal={type:'restock',item:it};S.restockPortions=1;render();} }
+function openWasteModal(id){ var it=S.items.filter(function(x){return x.id===id;})[0]; if(it&&it.portions>0){S.modal={type:'waste',item:it};S.wastePortions=1;render();} }
+function openRemoveModal(id){ var it=S.items.filter(function(x){return x.id===id;})[0]; if(it){S.modal={type:'confirm-remove',item:it};render();} }
+
+// ── Add view
+function renderAdd(){
+  var f=S.form;
+  var h='<div style="font-size:22px;font-weight:700;margin-bottom:18px;">Log a Prep Session</div>';
+  h+='<label style="'+cs.label+'">Item name</label>';
+  h+='<input id="f-name" style="'+cs.input+'" value="'+esc(f.name)+'" placeholder="e.g. Shawarma Chicken" />';
+  h+='<label style="'+cs.label+'">Category</label>';
+  h+='<select id="f-cat" style="'+cs.input+'">';
+  CATS.filter(function(c){return c!=='All';}).forEach(function(c){h+='<option'+(f.category===c?' selected':'')+'>'+c+'</option>';});
+  h+='</select>';
+  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">';
+  h+='<div><label style="'+cs.label+'">Portions prepped</label><input id="f-portions" type="number" style="'+cs.input+'" value="'+esc(f.portions)+'" placeholder="e.g. 12" min="1" /></div>';
+  h+='<div><label style="'+cs.label+'">Expires after (days)</label><input id="f-expiry" type="number" style="'+cs.input+'" value="'+esc(f.expiryDays)+'" placeholder="default: '+S.settings.expiryDays+'" min="1" /></div>';
+  h+='</div>';
+  h+='<div style="font-size:15px;font-weight:700;margin:18px 0 2px;color:#5a3e2a;">Macros per portion <span style="font-size:12px;color:#a08060;font-weight:400;">(optional)</span></div>';
+  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">';
+  [['f-cal','Calories',f.cal],['f-protein','Protein (g)',f.protein],['f-carbs','Carbs (g)',f.carbs],['f-fat','Fat (g)',f.fat]].forEach(function(m){
+    h+='<div><label style="'+cs.label+'">'+m[1]+'</label><input id="'+m[0]+'" type="number" style="'+cs.input+'" value="'+esc(m[2])+'" placeholder="0" min="0" /></div>';
+  });
+  h+='</div>';
+  h+='<label style="'+cs.label+'">Notes</label>';
+  h+='<input id="f-notes" style="'+cs.input+'" value="'+esc(f.notes)+'" placeholder="e.g. made with thighs, extra spicy" />';
+  h+='<button onclick="collectAndAdd()" style="'+cs.btnPrimary+'width:100%;margin-top:24px;padding:14px;">Add to Stock</button>';
+  return h;
+}
+
+function collectAndAdd(){
+  S.form={
+    name:ge('f-name')?ge('f-name').value:'',
+    category:ge('f-cat')?ge('f-cat').value:'Protein',
+    portions:ge('f-portions')?ge('f-portions').value:'',
+    expiryDays:ge('f-expiry')?ge('f-expiry').value:'',
+    cal:ge('f-cal')?ge('f-cal').value:'',
+    protein:ge('f-protein')?ge('f-protein').value:'',
+    carbs:ge('f-carbs')?ge('f-carbs').value:'',
+    fat:ge('f-fat')?ge('f-fat').value:'',
+    notes:ge('f-notes')?ge('f-notes').value:''
+  };
+  addItem();
+}
+
+// ── Log view
+function renderLog(){
+  var avail=S.items.filter(function(it){return it.portions>0;});
+  var h='<div style="font-size:22px;font-weight:700;margin-bottom:6px;">Log a Meal</div>';
+  h+='<div style="color:#7a5c3a;font-size:13px;margin-bottom:20px;">Tap an item to deduct a portion from stock</div>';
+  if(!avail.length){
+    h+='<div style="text-align:center;padding:48px 20px;color:#a08060;"><div style="font-size:40px;margin-bottom:12px;">😅</div>';
+    h+='<div style="font-size:18px;font-weight:700;margin-bottom:6px;color:#7a5c3a;">No stock available</div>';
+    h+='<div style="font-size:13px;">Time to prep!</div></div>';
+    return h;
+  }
+  avail.forEach(function(it){
+    var fgt=daysSince(it.lastEaten||it.prepDate)>=S.settings.forgottenDays;
+    h+='<button onclick="openLogModal(\''+it.id+'\')" style="background:#fff8f0;border:1px solid '+(fgt?'#9080c0':'#e0d0ba')+';border-radius:12px;padding:14px 16px;width:100%;text-align:left;cursor:pointer;display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">';
+    h+='<div><div style="font-weight:700;font-size:15px;color:#3d2b1a;">'+esc(it.name)+(fgt?' 💤':'')+'</div>';
+    h+='<div style="font-size:12px;color:#7a5c3a;margin-top:2px;">'+esc(it.category)+(it.macros&&it.macros.cal?' · '+it.macros.cal+' cal · '+it.macros.protein+'g protein':'')+'</div></div>';
+    h+='<div style="background:#3d2b1a;color:#f0d9b5;border-radius:20px;padding:4px 14px;font-size:14px;font-weight:700;flex-shrink:0;">'+it.portions+'</div>';
+    h+='</button>';
+  });
+  return h;
+}
+
+// ── History view
+function renderHistory(){
+  var today=todayStr(), grouped={};
+  S.history.slice(0,100).forEach(function(h){
+    var d=h.date?h.date.split('T')[0]:'unknown';
+    if(!grouped[d])grouped[d]=[];
+    grouped[d].push(h);
+  });
+  var days=Object.keys(grouped).sort(function(a,b){return b.localeCompare(a);});
+  var h='<div style="font-size:22px;font-weight:700;margin-bottom:18px;">Activity History</div>';
+  if(!S.history.length){ h+='<div style="text-align:center;padding:40px;color:#a08060;">No activity yet</div>'; return h; }
+  days.forEach(function(day){
+    var label=day===today?'Today':daysAgo(day+'T12:00:00')||day;
+    var dc=0,dp=0,dany=false;
+    grouped[day].filter(function(x){return x.type==='eat';}).forEach(function(x){
+      var it=S.items.filter(function(z){return z.id===x.itemId;})[0];
+      if(it&&it.macros&&it.macros.cal){dc+=parseFloat(it.macros.cal)*x.portions;dp+=parseFloat(it.macros.protein||0)*x.portions;dany=true;}
+    });
+    h+='<div style="display:flex;justify-content:space-between;align-items:baseline;margin:16px 0 4px;">';
+    h+='<div style="font-size:11px;font-weight:700;color:#7a5c3a;text-transform:uppercase;letter-spacing:0.8px;">'+label+'</div>';
+    if(dany) h+='<div style="font-size:11px;color:#a08060;">'+Math.round(dc)+' cal · '+Math.round(dp)+'g pro</div>';
+    h+='</div>';
+    h+='<div style="background:#fff8f0;border-radius:12px;border:1px solid #e0d0ba;padding:0 14px;margin-bottom:12px;">';
+    grouped[day].forEach(function(x){
+      var icon=x.type==='eat'?'🍽':x.type==='waste'?'🗑':x.type==='deleted'?'❌':'🥡';
+      var meta=x.type==='eat'?'Ate '+x.portions+' portion'+(x.portions>1?'s':''):x.type==='waste'?'Wasted '+x.portions+' portion'+(x.portions>1?'s':''):x.type==='deleted'?'Removed from stock':'Prepped '+x.portions+' portions';
+      h+='<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid #e8ddd0;">';
+      h+='<div style="font-size:18px;width:26px;text-align:center;flex-shrink:0;">'+icon+'</div>';
+      h+='<div style="flex:1;"><div style="font-size:14px;font-weight:700;">'+esc(x.itemName)+'</div>';
+      h+='<div style="font-size:12px;color:#7a5c3a;">'+meta+'</div></div></div>';
+    });
+    h+='</div>';
+  });
+  return h;
+}
+
+// ── Settings view
+function renderSettings(){
+  var s=S.settings;
+  var h='<div style="font-size:22px;font-weight:700;margin-bottom:18px;">Settings</div>';
+
+  h+='<div style="margin-bottom:24px;">';
+  h+='<div style="font-size:17px;font-weight:700;margin-bottom:2px;">Stock Alerts</div>';
+  h+='<div style="font-size:12px;color:#a08060;margin-bottom:12px;">Control when warnings appear</div>';
+  h+=settingsRow('Low stock warning','Warn when portions at or below this','s-low',s.lowStockThreshold);
+  h+=settingsRow('Default expiry (days)','Applied when no per-item expiry is set','s-exp',s.expiryDays);
+  h+='</div>';
+
+  h+='<div style="margin-bottom:24px;">';
+  h+='<div style="font-size:17px;font-weight:700;margin-bottom:2px;">Forgotten Item Reminder</div>';
+  h+='<div style="font-size:12px;color:#a08060;margin-bottom:12px;">Alerts repeat daily until you eat the item</div>';
+  h+=settingsRow('First reminder after','Days since last eaten or prepped','s-fgt',s.forgottenDays);
+  h+='</div>';
+
+  h+='<button onclick="saveSettings()" style="'+cs.btnPrimary+'width:100%;padding:14px;margin-bottom:28px;">Save Settings</button>';
+
+  h+='<div style="margin-bottom:24px;">';
+  h+='<div style="font-size:17px;font-weight:700;margin-bottom:2px;">Data Backup</div>';
+  h+='<div style="font-size:12px;color:#a08060;margin-bottom:12px;">Export your stock and history as JSON</div>';
+  h+='<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #e8ddd0;">';
+  h+='<div><div style="font-size:14px;">Export data</div><div style="font-size:12px;color:#a08060;">Download JSON backup</div></div>';
+  h+='<button onclick="exportData()" style="'+cs.btnSecondary+'padding:8px 14px;font-size:13px;">Export</button></div>';
+  h+='<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;">';
+  h+='<div><div style="font-size:14px;">Import data</div><div style="font-size:12px;color:#a08060;">Restore from backup</div></div>';
+  h+='<label style="'+cs.btnSecondary+'padding:8px 14px;font-size:13px;cursor:pointer;">Import <input type="file" id="import-file" accept=".json" style="display:none;" onchange="handleImport(this)" /></label>';
   h+='</div></div>';
   return h;
 }
 
-document.getElementById('app').innerHTML='<p>renderHeader defined, trying renderStock...</p>';
+function settingsRow(label,sub,id,val){
+  return '<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #e8ddd0;">'+
+    '<div><div style="font-size:14px;">'+label+'</div><div style="font-size:12px;color:#a08060;">'+sub+'</div></div>'+
+    '<input id="'+id+'" type="number" value="'+val+'" min="1" style="width:64px;padding:7px 10px;border-radius:8px;border:1px solid #d4c4a8;background:#fff8f0;font-size:14px;color:#3d2b1a;text-align:center;-webkit-appearance:none;outline:none;" />'+
+    '</div>';
+}
 
-function renderStock(){
-  var h='<div style="padding:16px;">';
-  h+='<div style="font-size:22px;font-weight:700;margin-bottom:16px;">Your Stock</div>';
-  if(!S.items.length){
-    h+='<div style="text-align:center;padding:48px 20px;color:#a08060;">';
-    h+='<div style="font-size:40px;margin-bottom:12px;">🥡</div>';
-    h+='<div style="font-size:18px;margin-bottom:6px;">No items yet</div>';
-    h+='<div style="font-size:13px;">Tap Add to log your first prep batch</div>';
-    h+='</div>';
-  } else {
-    S.items.forEach(function(it){
-      h+='<div style="background:#fff8f0;border-radius:14px;border:1px solid #e0d0ba;padding:14px;margin-bottom:10px;">';
-      h+='<div style="font-weight:700;">'+it.name+'</div>';
-      h+='<div style="color:#a08060;font-size:12px;">'+it.portions+' portions</div>';
-      h+='</div>';
+function handleImport(input){ if(input.files[0])importData(input.files[0]); }
+
+// ── Modal
+function renderModal(){
+  var m=S.modal, it=m.item;
+  var sheet='border-radius:20px 20px 0 0;padding:24px 24px calc(env(safe-area-inset-bottom) + 24px);width:100%;animation:slideUp 0.2s ease;background:#fff8f0;';
+  var overlay='position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;display:flex;align-items:flex-end;animation:fadeIn 0.15s ease;';
+  var h='<div style="'+overlay+'" onclick="if(event.target===this){S.modal=null;render();}">';
+
+  if(m.type==='log'){
+    var n=S.logPortions;
+    h+='<div style="'+sheet+'">';
+    h+='<div style="font-size:18px;font-weight:700;margin-bottom:4px;">Log: '+esc(it.name)+'</div>';
+    h+='<div style="color:#7a5c3a;font-size:13px;margin-bottom:16px;">'+it.portions+' portion'+(it.portions!==1?'s':'')+' available</div>';
+    h+=stepperHTML('logPortions',n,1,it.portions);
+    if(it.macros&&it.macros.cal) h+='<div style="background:#f0e6d4;border-radius:8px;padding:10px 14px;margin-top:14px;font-size:13px;color:#5a3e2a;">~'+Math.round(it.macros.cal*n)+' cal · '+Math.round(it.macros.protein*n)+'g protein · '+Math.round(it.macros.carbs*n)+'g carbs · '+Math.round(it.macros.fat*n)+'g fat</div>';
+    h+='<div style="display:flex;gap:10px;margin-top:16px;">';
+    h+='<button onclick="S.modal=null;render();" style="'+cs.btnSecondary+'flex:1;">Cancel</button>';
+    h+='<button onclick="logMeal();" style="'+cs.btnPrimary+'flex:1;">Log It</button>';
+    h+='</div></div>';
+
+  } else if(m.type==='restock'){
+    var rn=S.restockPortions;
+    h+='<div style="'+sheet+'">';
+    h+='<div style="font-size:18px;font-weight:700;margin-bottom:4px;">Restock: '+esc(it.name)+'</div>';
+    h+='<div style="color:#7a5c3a;font-size:13px;margin-bottom:16px;">Currently '+it.portions+' portion'+(it.portions!==1?'s':'')+' remaining</div>';
+    h+=stepperHTML('restockPortions',rn,1,999);
+    h+='<div style="display:flex;gap:10px;margin-top:16px;">';
+    h+='<button onclick="S.modal=null;render();" style="'+cs.btnSecondary+'flex:1;">Cancel</button>';
+    h+='<button onclick="restockItem();" style="'+cs.btnPrimary+'flex:1;">Add Stock</button>';
+    h+='</div></div>';
+
+  } else if(m.type==='waste'){
+    var wn=S.wastePortions;
+    h+='<div style="'+sheet+'">';
+    h+='<div style="font-size:18px;font-weight:700;margin-bottom:4px;">Waste: '+esc(it.name)+'</div>';
+    h+='<div style="color:#7a5c3a;font-size:13px;margin-bottom:16px;">'+it.portions+' portion'+(it.portions!==1?'s':'')+' in stock · wasting all removes the item</div>';
+    h+=stepperHTML('wastePortions',wn,1,it.portions);
+    h+='<div style="display:flex;gap:10px;margin-top:16px;">';
+    h+='<button onclick="S.modal=null;render();" style="'+cs.btnSecondary+'flex:1;">Cancel</button>';
+    h+='<button onclick="wastePortions();" style="background:#b85c38;color:#fff;border:none;border-radius:10px;padding:12px 16px;font-size:13px;font-weight:700;cursor:pointer;flex:1;">Mark as Wasted</button>';
+    h+='</div></div>';
+
+  } else if(m.type==='confirm-remove'){
+    h+='<div style="'+sheet+'">';
+    h+='<div style="font-size:18px;font-weight:700;margin-bottom:4px;">Remove item?</div>';
+    h+='<div style="color:#7a5c3a;font-size:13px;margin-bottom:20px;">&quot;'+esc(it.name)+'&quot; will be removed entirely. This can\'t be undone.</div>';
+    h+='<div style="display:flex;gap:10px;">';
+    h+='<button onclick="S.modal=null;render();" style="'+cs.btnSecondary+'flex:1;">Cancel</button>';
+    h+='<button onclick="removeItem(\''+it.id+'\');" style="background:#b85c38;color:#fff;border:none;border-radius:10px;padding:12px 16px;font-size:13px;font-weight:700;cursor:pointer;flex:1;">Remove</button>';
+    h+='</div></div>';
+
+  } else if(m.type==='edit'){
+    var f=S.editForm;
+    h+='<div style="'+sheet+'max-height:85vh;overflow-y:auto;">';
+    h+='<div style="font-size:18px;font-weight:700;margin-bottom:14px;">Edit: '+esc(it.name)+'</div>';
+    h+='<label style="'+cs.label+'">Name</label><input id="e-name" style="'+cs.input+'" value="'+esc(f.name)+'" />';
+    h+='<label style="'+cs.label+'">Category</label><select id="e-cat" style="'+cs.input+'">';
+    CATS.filter(function(c){return c!=='All';}).forEach(function(c){h+='<option'+(f.category===c?' selected':'')+'>'+c+'</option>';});
+    h+='</select>';
+    h+='<label style="'+cs.label+'">Expires after (days)</label><input id="e-expiry" type="number" style="'+cs.input+'" value="'+esc(f.expiryDays)+'" placeholder="e.g. 5" min="1" />';
+    h+='<div style="font-size:14px;font-weight:700;margin:16px 0 2px;color:#5a3e2a;">Macros per portion</div>';
+    h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">';
+    [['e-cal','Calories',f.cal],['e-protein','Protein (g)',f.protein],['e-carbs','Carbs (g)',f.carbs],['e-fat','Fat (g)',f.fat]].forEach(function(m){
+      h+='<div><label style="'+cs.label+'">'+m[1]+'</label><input id="'+m[0]+'" type="number" style="'+cs.input+'" value="'+esc(m[2])+'" placeholder="0" /></div>';
     });
+    h+='</div>';
+    h+='<label style="'+cs.label+'">Notes</label><input id="e-notes" style="'+cs.input+'" value="'+esc(f.notes)+'" placeholder="e.g. made with thighs" />';
+    h+='<div style="display:flex;gap:10px;margin-top:20px;">';
+    h+='<button onclick="S.modal=null;render();" style="'+cs.btnSecondary+'flex:1;">Cancel</button>';
+    h+='<button onclick="collectAndSaveEdit();" style="'+cs.btnPrimary+'flex:1;">Save Changes</button>';
+    h+='</div></div>';
   }
+
   h+='</div>';
   return h;
 }
 
-document.getElementById('app').innerHTML='<p>renderStock defined, calling doRender...</p>';
-
-function doRender(){
-  try{
-    var h=renderHeader()+renderStock();
-    document.getElementById('app').innerHTML=h;
-  }catch(e){
-    document.getElementById('app').innerHTML='<pre style="color:red;font-size:11px">doRender error: '+e.message+'</pre>';
-  }
+function stepperHTML(field,val,min,max){
+  return '<div style="display:flex;align-items:center;gap:20px;">'+
+    '<button onclick="S.'+field+'=Math.max('+min+',S.'+field+'-1);render();" style="width:44px;height:44px;border-radius:10px;border:1px solid #c8b89a;background:transparent;font-size:22px;cursor:pointer;">&minus;</button>'+
+    '<div style="font-size:28px;font-weight:700;min-width:40px;text-align:center;">'+val+'</div>'+
+    '<button onclick="S.'+field+'=Math.min('+max+',S.'+field+'+1);render();" style="width:44px;height:44px;border-radius:10px;border:1px solid #c8b89a;background:transparent;font-size:22px;cursor:pointer;">+</button>'+
+    '</div>';
 }
 
-doRender();
+function collectAndSaveEdit(){
+  S.editForm.name=ge('e-name')?ge('e-name').value:S.editForm.name;
+  S.editForm.category=ge('e-cat')?ge('e-cat').value:S.editForm.category;
+  S.editForm.expiryDays=ge('e-expiry')?ge('e-expiry').value:S.editForm.expiryDays;
+  S.editForm.cal=ge('e-cal')?ge('e-cal').value:S.editForm.cal;
+  S.editForm.protein=ge('e-protein')?ge('e-protein').value:S.editForm.protein;
+  S.editForm.carbs=ge('e-carbs')?ge('e-carbs').value:S.editForm.carbs;
+  S.editForm.fat=ge('e-fat')?ge('e-fat').value:S.editForm.fat;
+  S.editForm.notes=ge('e-notes')?ge('e-notes').value:S.editForm.notes;
+  saveEdit();
+}
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+localLoad();
+S.syncStatus='syncing'; S.syncMsg='Loading\u2026';
+
+fetch(SB_URL+'/rest/v1/prepmacros_data?id=eq.singleton',{
+  headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}
+})
+.then(function(res){return res.json();})
+.then(function(data){
+  if(data&&data.length>0){
+    var r=data[0];
+    S.items=r.items||[];
+    S.history=r.history||[];
+    if(r.settings)for(var k in r.settings)S.settings[k]=r.settings[k];
+    S.dismissedAlerts=r.dismissed_alerts||{};
+    localSave();
+    S.syncStatus='synced'; S.syncMsg='Saved to cloud';
+  } else {
+    S.syncStatus='synced'; S.syncMsg='Ready';
+  }
+  render();
+})
+.catch(function(){
+  S.syncStatus='error'; S.syncMsg='Offline \u2013 using local data';
+  render();
+});
 </script>
+
 </body>
 </html>
