@@ -1,0 +1,7 @@
+<!DOCTYPE html>
+<html>
+<body>
+<h1 style="color:red">IT WORKS</h1>
+<script>document.write('JS works too')</script>
+</body>
+</html>
