@@ -277,10 +277,8 @@ function wastePortions(){
   if(!S.modal)return;
   var n=Math.min(S.wastePortions,S.modal.item.portions); var id=S.modal.item.id;
   var u=unitOf(S.modal.item);
-  var wasAll=S.modal.item.portions-n<=0;
   S.items=S.items.map(function(it){return it.id===id?{id:it.id,name:it.name,category:it.category,unit:it.unit,portions:Math.max(0,it.portions-n),totalPortions:it.totalPortions,expiryDays:it.expiryDays,macros:it.macros,notes:it.notes,prepDate:it.prepDate,lastEaten:it.lastEaten,archived:it.archived}:it;});
   S.history.unshift({hid:newHid(),type:'waste',itemId:id,itemName:S.modal.item.name,portions:n,unit:u,date:new Date().toISOString()});
-  if(wasAll)S.items=S.items.filter(function(it){return it.id!==id;});
   save(); S.modal=null; S.wastePortions=1; render();
 }
 
@@ -976,7 +974,7 @@ function renderModal(){
     var u=unitOf(it);
     h+='<div style="'+sheet+'">';
     h+='<div style="font-size:18px;font-weight:700;margin-bottom:4px;">Waste: '+esc(it.name)+'</div>';
-    h+='<div style="color:#7a5c3a;font-size:13px;margin-bottom:16px;">'+it.portions+(u==='portions'?'':u)+' in stock · wasting all removes the item</div>';
+    h+='<div style="color:#7a5c3a;font-size:13px;margin-bottom:16px;">'+it.portions+(u==='portions'?'':u)+' in stock</div>';
     h+=stepperHTML('wastePortions',wn,unitStep(u),it.portions,u);
     h+='<div style="display:flex;gap:10px;margin-top:16px;">';
     h+='<button onclick="S.modal=null;render();" style="'+cs.btnSecondary+'flex:1;">Cancel</button>';
