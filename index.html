@@ -301,7 +301,11 @@ function renderStock(){
   var h='<div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:14px;">';
   CATS.forEach(function(c){
     var active=S.filterCat===c;
-    h+='<button onclick="S.filterCat=\''+c+'\';render();" style="padding:5px 14px;border-radius:20px;white-space:nowrap;font-size:12px;border:'+(active?'none':'1px solid #e8ddd0')+';background:'+(active?'#3d2b1a':'transparent')+';color:'+(active?'#f0d9b5':'#7a5c3a')+';">'+c+'</button>';
+    var count=c==='All'?totP():S.items.filter(function(it){return it.category===c;}).reduce(function(s,it){return s+it.portions;},0);
+    var badgeBg=active?'rgba(240,217,181,0.25)':'#f0e6d4';
+    var badgeColor=active?'#f0d9b5':'#7a5c3a';
+    var badge=count>0?'<span style="background:'+badgeBg+';border-radius:10px;padding:1px 7px;margin-left:6px;font-size:11px;font-weight:700;color:'+badgeColor+';">'+count+'</span>':'';
+    h+='<button onclick="S.filterCat=\''+c+'\';render();" style="padding:5px 12px;border-radius:20px;white-space:nowrap;font-size:12px;border:'+(active?'none':'1px solid #e8ddd0')+';background:'+(active?'#3d2b1a':'transparent')+';color:'+(active?'#f0d9b5':'#7a5c3a')+';display:inline-flex;align-items:center;">'+c+badge+'</button>';
   });
   h+='</div>';
 
