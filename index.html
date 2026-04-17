@@ -41,7 +41,7 @@ var S = {
   dismissedAlerts:{}, view:'stock', filterCat:'All', expandedId:null,
   modal:null, logPortions:1, restockPortions:1, wastePortions:1, editForm:null,
   syncStatus:'syncing', syncMsg:'Loading\u2026',
-  showArchived:false, stockFilter:'all',
+  showArchived:false, stockFilter:'all', histEditAmount:0, reorderMode:false,
   form:{name:'',category:'Protein',unit:'portions',portions:'',expiryDays:'',cal:'',protein:'',carbs:'',fat:'',notes:''}
 };
 
@@ -59,6 +59,7 @@ function lowC(){ return activeItems().filter(function(it){return it.portions>0&&
 function outC(){ return activeItems().filter(function(it){return it.portions===0;}).length; }
 function archivedC(){ return S.items.filter(isArchived).length; }
 function ge(id){ return document.getElementById(id); }
+function newHid(){ return 'h'+Date.now()+Math.random().toString(36).slice(2,7); }
 
 // Unit helpers
 function unitOf(it){ return it.unit||'portions'; }
@@ -150,7 +151,7 @@ function addItem(){
     expiryDays:f.expiryDays?parseInt(f.expiryDays):null,
     macros:{cal:f.cal,protein:f.protein,carbs:f.carbs,fat:f.fat},notes:f.notes,prepDate:new Date().toISOString(),lastEaten:null};
   S.items.push(item);
-  S.history.unshift({type:'prep',itemId:item.id,itemName:item.name,portions:item.portions,unit:unit,date:new Date().toISOString()});
+  S.history.unshift({hid:newHid(),type:'prep',itemId:item.id,itemName:item.name,portions:item.portions,unit:unit,date:new Date().toISOString()});
   save(); S.form={name:'',category:'Protein',unit:'portions',portions:'',expiryDays:'',cal:'',protein:'',carbs:'',fat:'',notes:''}; S.view='stock'; render();
 }
 
@@ -159,7 +160,7 @@ function restockItem(){
   var id=S.modal.item.id;
   var u=unitOf(S.modal.item);
   S.items=S.items.map(function(it){return it.id===id?{id:it.id,name:it.name,category:it.category,unit:it.unit,portions:it.portions+n,totalPortions:it.totalPortions+n,expiryDays:it.expiryDays,macros:it.macros,notes:it.notes,prepDate:new Date().toISOString(),lastEaten:it.lastEaten,archived:false}:it;});
-  S.history.unshift({type:'prep',itemId:id,itemName:S.modal.item.name,portions:n,unit:u,date:new Date().toISOString()});
+  S.history.unshift({hid:newHid(),type:'prep',itemId:id,itemName:S.modal.item.name,portions:n,unit:u,date:new Date().toISOString()});
   ['exp','expw','fgt'].forEach(function(p){delete S.dismissedAlerts[p+'-'+id];});
   save(); S.modal=null; S.restockPortions=1; render();
 }
@@ -169,14 +170,14 @@ function logMeal(){
   var n=Math.min(S.logPortions,S.modal.item.portions); var id=S.modal.item.id;
   var u=unitOf(S.modal.item);
   S.items=S.items.map(function(it){return it.id===id?{id:it.id,name:it.name,category:it.category,unit:it.unit,portions:Math.max(0,it.portions-n),totalPortions:it.totalPortions,expiryDays:it.expiryDays,macros:it.macros,notes:it.notes,prepDate:it.prepDate,lastEaten:new Date().toISOString(),archived:it.archived}:it;});
-  S.history.unshift({type:'eat',itemId:id,itemName:S.modal.item.name,portions:n,unit:u,date:new Date().toISOString()});
+  S.history.unshift({hid:newHid(),type:'eat',itemId:id,itemName:S.modal.item.name,portions:n,unit:u,date:new Date().toISOString()});
   delete S.dismissedAlerts['fgt-'+id];
   save(); S.modal=null; S.logPortions=1; render();
 }
 
 function removeItem(id){
   var it=S.items.filter(function(x){return x.id===id;})[0];
-  if(it)S.history.unshift({type:'deleted',itemId:id,itemName:it.name,portions:it.portions,unit:unitOf(it),date:new Date().toISOString()});
+  if(it)S.history.unshift({hid:newHid(),type:'deleted',itemId:id,itemName:it.name,portions:it.portions,unit:unitOf(it),date:new Date().toISOString()});
   S.items=S.items.filter(function(x){return x.id!==id;}); S.modal=null; save(); render();
 }
 
@@ -186,6 +187,58 @@ function toggleArchive(id){
     return {id:it.id,name:it.name,category:it.category,unit:it.unit,portions:it.portions,totalPortions:it.totalPortions,expiryDays:it.expiryDays,macros:it.macros,notes:it.notes,prepDate:it.prepDate,lastEaten:it.lastEaten,archived:!isArchived(it)};
   });
   save(); render();
+}
+
+// History entry editing (Today tab)
+function openHistoryEdit(hid){
+  var entry=S.history.filter(function(x){return x.hid===hid;})[0]; if(!entry)return;
+  S.modal={type:'edit-history',entry:entry};
+  S.histEditAmount=entry.portions;
+  render();
+}
+
+function saveHistoryEdit(hid){
+  var entry=S.history.filter(function(x){return x.hid===hid;})[0]; if(!entry)return;
+  var newAmt=parseFloat(S.histEditAmount);
+  if(isNaN(newAmt)||newAmt<=0){S.modal=null;render();return;}
+  var delta=newAmt-entry.portions;
+  // Adjust stock accordingly
+  var it=S.items.filter(function(x){return x.id===entry.itemId;})[0];
+  if(it){
+    var stockDelta=0;
+    if(entry.type==='eat'||entry.type==='waste') stockDelta=-delta; // eating/wasting MORE means less stock
+    else if(entry.type==='prep') stockDelta=delta; // prepping more means more stock
+    S.items=S.items.map(function(x){
+      if(x.id!==it.id) return x;
+      return {id:x.id,name:x.name,category:x.category,unit:x.unit,portions:Math.max(0,x.portions+stockDelta),totalPortions:Math.max(x.totalPortions,x.portions+stockDelta),expiryDays:x.expiryDays,macros:x.macros,notes:x.notes,prepDate:x.prepDate,lastEaten:x.lastEaten,archived:x.archived};
+    });
+  }
+  // Update the history entry
+  S.history=S.history.map(function(x){
+    if(x.hid!==hid) return x;
+    var copy={}; for(var k in x) copy[k]=x[k];
+    copy.portions=newAmt;
+    copy.edited=true;
+    return copy;
+  });
+  save();S.modal=null;S.histEditAmount=0;render();
+}
+
+function deleteHistoryEntry(hid){
+  var entry=S.history.filter(function(x){return x.hid===hid;})[0]; if(!entry)return;
+  // Reverse the effect on stock
+  var it=S.items.filter(function(x){return x.id===entry.itemId;})[0];
+  if(it){
+    var stockDelta=0;
+    if(entry.type==='eat'||entry.type==='waste') stockDelta=entry.portions; // undo eat: add back
+    else if(entry.type==='prep') stockDelta=-entry.portions; // undo prep: subtract
+    S.items=S.items.map(function(x){
+      if(x.id!==it.id) return x;
+      return {id:x.id,name:x.name,category:x.category,unit:x.unit,portions:Math.max(0,x.portions+stockDelta),totalPortions:x.totalPortions,expiryDays:x.expiryDays,macros:x.macros,notes:x.notes,prepDate:x.prepDate,lastEaten:x.lastEaten,archived:x.archived};
+    });
+  }
+  S.history=S.history.filter(function(x){return x.hid!==hid;});
+  save();S.modal=null;render();
 }
 
 function openArchiveConfirm(id){
@@ -226,7 +279,7 @@ function wastePortions(){
   var u=unitOf(S.modal.item);
   var wasAll=S.modal.item.portions-n<=0;
   S.items=S.items.map(function(it){return it.id===id?{id:it.id,name:it.name,category:it.category,unit:it.unit,portions:Math.max(0,it.portions-n),totalPortions:it.totalPortions,expiryDays:it.expiryDays,macros:it.macros,notes:it.notes,prepDate:it.prepDate,lastEaten:it.lastEaten,archived:it.archived}:it;});
-  S.history.unshift({type:'waste',itemId:id,itemName:S.modal.item.name,portions:n,unit:u,date:new Date().toISOString()});
+  S.history.unshift({hid:newHid(),type:'waste',itemId:id,itemName:S.modal.item.name,portions:n,unit:u,date:new Date().toISOString()});
   if(wasAll)S.items=S.items.filter(function(it){return it.id!==id;});
   save(); S.modal=null; S.wastePortions=1; render();
 }
@@ -367,6 +420,13 @@ function renderStock(){
     else if(S.stockFilter==='out') items=items.filter(function(it){return it.portions===0;});
   }
 
+  // Sort by user-defined order (falls back to original sequence for items with no order field yet)
+  items.sort(function(a,b){
+    var ao=typeof a.order==='number'?a.order:9999;
+    var bo=typeof b.order==='number'?b.order:9999;
+    return ao-bo;
+  });
+
   var h='';
 
   // Archived banner + toggle
@@ -388,7 +448,7 @@ function renderStock(){
   }
 
   // Category filter pills (only shown when not viewing archived and no stock filter)
-  if(!S.showArchived && S.stockFilter==='all'){
+  if(!S.showArchived && S.stockFilter==='all' && !S.reorderMode){
     h+='<div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:14px;">';
     CATS.forEach(function(c){
       var active=S.filterCat===c;
@@ -401,19 +461,34 @@ function renderStock(){
     h+='</div>';
   }
 
+  // Reorder mode banner
+  if(S.reorderMode){
+    h+='<div style="background:#f0e6d4;border-radius:10px;padding:10px 14px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;">';
+    h+='<div style="font-size:13px;color:#5a3e2a;"><strong>Reorder mode</strong> — drag the ≡ handle to rearrange</div>';
+    h+='<button onclick="exitReorderMode()" style="background:#3d2b1a;color:#f0d9b5;border:none;border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;">Done</button>';
+    h+='</div>';
+  }
+
   if(!items.length){
     h+='<div style="text-align:center;padding:48px 20px;color:#a08060;">';
     h+='<div style="font-size:40px;margin-bottom:12px;">'+(S.showArchived?'📦':'🥡')+'</div>';
     h+='<div style="font-size:18px;font-weight:700;margin-bottom:6px;color:#7a5c3a;">'+(S.showArchived?'No archived items':(S.stockFilter==='low'?'Nothing low':(S.stockFilter==='out'?'Nothing out of stock':'No items yet')))+'</div>';
     if(!S.showArchived && S.stockFilter==='all') h+='<div style="font-size:13px;">Tap &quot;+ Add&quot; to log your first prep batch</div>';
     h+='</div>';
+  } else if(S.reorderMode){
+    h+='<div id="reorder-list">';
+    items.forEach(function(it){ h+=renderReorderCard(it); });
+    h+='</div>';
   } else {
     items.forEach(function(it){ h+=renderCard(it); });
   }
 
-  // Archive access footer (only on default stock view)
-  if(!S.showArchived && S.stockFilter==='all' && archCount>0){
-    h+='<button onclick="S.showArchived=true;S.expandedId=null;render();" style="background:transparent;border:1px dashed #c8b89a;color:#7a5c3a;border-radius:10px;padding:10px;width:100%;font-size:13px;cursor:pointer;margin-top:16px;">📁 View archived ('+archCount+')</button>';
+  // Archive access footer + Reorder toggle (only on default stock view)
+  if(!S.showArchived && S.stockFilter==='all' && !S.reorderMode){
+    h+='<div style="display:flex;gap:8px;margin-top:16px;">';
+    if(items.length>1) h+='<button onclick="enterReorderMode()" style="flex:1;background:transparent;border:1px dashed #c8b89a;color:#7a5c3a;border-radius:10px;padding:10px;font-size:13px;cursor:pointer;">↕ Reorder</button>';
+    if(archCount>0) h+='<button onclick="S.showArchived=true;S.expandedId=null;render();" style="flex:1;background:transparent;border:1px dashed #c8b89a;color:#7a5c3a;border-radius:10px;padding:10px;font-size:13px;cursor:pointer;">📁 Archived ('+archCount+')</button>';
+    h+='</div>';
   }
 
   return h;
@@ -502,6 +577,61 @@ function openRestockModal(id){ var it=S.items.filter(function(x){return x.id===i
 function openWasteModal(id){ var it=S.items.filter(function(x){return x.id===id;})[0]; if(it&&it.portions>0){S.modal={type:'waste',item:it};S.wastePortions=unitStep(unitOf(it));render();} }
 function openRemoveModal(id){ var it=S.items.filter(function(x){return x.id===id;})[0]; if(it){S.modal={type:'confirm-remove',item:it};render();} }
 
+// Reorder mode helpers
+function enterReorderMode(){
+  // Assign initial order values for items that don't have one yet, preserving current visual order
+  var visible=S.items.filter(function(it){return !isArchived(it);});
+  visible.sort(function(a,b){
+    var ao=typeof a.order==='number'?a.order:9999;
+    var bo=typeof b.order==='number'?b.order:9999;
+    return ao-bo;
+  });
+  visible.forEach(function(it,i){ it.order=i; });
+  S.reorderMode=true;
+  S.expandedId=null;
+  render();
+}
+
+function exitReorderMode(){
+  S.reorderMode=false;
+  save();
+  render();
+}
+
+function moveItem(id,direction){
+  // Get current ordered list of active items
+  var visible=S.items.filter(function(it){return !isArchived(it);});
+  visible.sort(function(a,b){
+    var ao=typeof a.order==='number'?a.order:9999;
+    var bo=typeof b.order==='number'?b.order:9999;
+    return ao-bo;
+  });
+  var idx=-1;
+  for(var i=0;i<visible.length;i++){ if(visible[i].id===id){idx=i;break;} }
+  if(idx<0) return;
+  var newIdx=idx+direction;
+  if(newIdx<0||newIdx>=visible.length) return;
+  // Swap
+  var tmp=visible[idx]; visible[idx]=visible[newIdx]; visible[newIdx]=tmp;
+  // Reassign order values
+  visible.forEach(function(it,i){ it.order=i; });
+  render();
+}
+
+function renderReorderCard(it){
+  var u=unitOf(it);
+  var h='<div style="background:#fff8f0;border:1px solid #e0d0ba;border-radius:12px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:12px;">';
+  h+='<div style="font-size:22px;color:#a08060;line-height:1;">≡</div>';
+  h+='<div style="flex:1;min-width:0;">';
+  h+='<div style="font-weight:700;font-size:15px;">'+esc(it.name)+'</div>';
+  h+='<div style="font-size:12px;color:#a08060;">'+esc(it.category)+' · '+it.portions+(u==='portions'?' portions':u)+'</div>';
+  h+='</div>';
+  h+='<button onclick="moveItem(\''+it.id+'\',-1)" style="width:36px;height:36px;border-radius:8px;border:1px solid #c8b89a;background:transparent;font-size:16px;cursor:pointer;flex-shrink:0;">▲</button>';
+  h+='<button onclick="moveItem(\''+it.id+'\',1)" style="width:36px;height:36px;border-radius:8px;border:1px solid #c8b89a;background:transparent;font-size:16px;cursor:pointer;flex-shrink:0;">▼</button>';
+  h+='</div>';
+  return h;
+}
+
 // ── Add view
 function renderAdd(){
   var f=S.form;
@@ -557,22 +687,49 @@ function collectAndAdd(){
 // ── Log view
 function renderLog(){
   var avail=S.items.filter(function(it){return it.portions>0 && !isArchived(it);});
+  // Apply category filter (reuse S.filterCat, shared with Stock view)
+  var filtered=S.filterCat==='All'?avail:avail.filter(function(it){return it.category===S.filterCat;});
   // Sort by most stock first (using portion/totalPortion ratio for cross-unit fairness, fall back to raw portions)
-  avail.sort(function(a,b){
+  filtered.sort(function(a,b){
     var ra=a.totalPortions>0?a.portions/a.totalPortions:a.portions;
     var rb=b.totalPortions>0?b.portions/b.totalPortions:b.portions;
     if(rb!==ra) return rb-ra;
     return b.portions-a.portions;
   });
   var h='<div style="font-size:22px;font-weight:700;margin-bottom:6px;">Log a Meal</div>';
-  h+='<div style="color:#7a5c3a;font-size:13px;margin-bottom:20px;">Tap an item to deduct a portion from stock</div>';
+  h+='<div style="color:#7a5c3a;font-size:13px;margin-bottom:16px;">Tap an item to deduct from stock</div>';
+
+  // Category filter pills
+  if(avail.length){
+    h+='<div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:14px;">';
+    CATS.forEach(function(c){
+      var active=S.filterCat===c;
+      var count=c==='All'?avail.length:avail.filter(function(it){return it.category===c;}).length;
+      if(c!=='All' && count===0) return; // Hide empty categories in Log view to reduce clutter
+      var badgeBg=active?'rgba(240,217,181,0.25)':'#f0e6d4';
+      var badgeColor=active?'#f0d9b5':'#7a5c3a';
+      var badge=count>0?'<span style="background:'+badgeBg+';border-radius:10px;padding:1px 7px;margin-left:6px;font-size:11px;font-weight:700;color:'+badgeColor+';">'+count+'</span>':'';
+      h+='<button onclick="S.filterCat=\''+c+'\';render();" style="padding:5px 12px;border-radius:20px;white-space:nowrap;font-size:12px;border:'+(active?'none':'1px solid #e8ddd0')+';background:'+(active?'#3d2b1a':'transparent')+';color:'+(active?'#f0d9b5':'#7a5c3a')+';display:inline-flex;align-items:center;">'+c+badge+'</button>';
+    });
+    h+='</div>';
+  }
+
   if(!avail.length){
     h+='<div style="text-align:center;padding:48px 20px;color:#a08060;"><div style="font-size:40px;margin-bottom:12px;">😅</div>';
     h+='<div style="font-size:18px;font-weight:700;margin-bottom:6px;color:#7a5c3a;">No stock available</div>';
     h+='<div style="font-size:13px;">Time to prep!</div></div>';
     return h;
   }
-  avail.forEach(function(it){
+
+  if(!filtered.length){
+    h+='<div style="text-align:center;padding:32px 20px;color:#a08060;">';
+    h+='<div style="font-size:14px;">Nothing in '+esc(S.filterCat)+' available.</div>';
+    h+='<button onclick="S.filterCat=\'All\';render();" style="margin-top:12px;background:transparent;border:1px solid #c8b89a;color:#7a5c3a;border-radius:8px;padding:6px 14px;font-size:13px;cursor:pointer;">Show all</button>';
+    h+='</div>';
+    return h;
+  }
+
+  filtered.forEach(function(it){
     var fgt=daysSince(it.lastEaten||it.prepDate)>=S.settings.forgottenDays;
     var u=unitOf(it);
     var macrosMeta='';
@@ -632,9 +789,16 @@ function renderToday(){
       var unitSuffix=u==='portions'?' portion'+(x.portions>1?'s':''):u;
       var m=it?macroFor(it,x.portions):null;
       var time=new Date(x.date).toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'});
-      h+='<div style="display:flex;align-items:center;gap:12px;padding:10px 0;'+(i<ate.length-1?'border-bottom:1px solid #e8ddd0;':'')+'">';
-      h+='<div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:700;">'+esc(x.itemName)+'</div>';
+      var tappable=!!x.hid;
+      var rowStyle='display:flex;align-items:center;gap:12px;padding:10px 0;'+(i<ate.length-1?'border-bottom:1px solid #e8ddd0;':'');
+      if(tappable){
+        h+='<div onclick="openHistoryEdit(\''+x.hid+'\')" style="'+rowStyle+'cursor:pointer;">';
+      } else {
+        h+='<div style="'+rowStyle+'">';
+      }
+      h+='<div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:700;">'+esc(x.itemName)+(x.edited?' <span style="font-size:10px;color:#a08060;font-weight:400;">(edited)</span>':'')+'</div>';
       h+='<div style="font-size:12px;color:#7a5c3a;">'+x.portions+unitSuffix+(m?' · '+Math.round(m.cal)+' cal':'')+' · '+time+'</div></div>';
+      if(tappable) h+='<div style="font-size:13px;color:#a08060;">›</div>';
       h+='</div>';
     });
     h+='</div>';
@@ -649,9 +813,16 @@ function renderToday(){
       var u=x.unit||(it?unitOf(it):'portions');
       var unitSuffix=u==='portions'?' portion'+(x.portions>1?'s':''):u;
       var time=new Date(x.date).toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'});
-      h+='<div style="display:flex;align-items:center;gap:12px;padding:10px 0;'+(i<wasted.length-1?'border-bottom:1px solid #e8ddd0;':'')+'">';
-      h+='<div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:700;">'+esc(x.itemName)+'</div>';
+      var tappable=!!x.hid;
+      var rowStyle='display:flex;align-items:center;gap:12px;padding:10px 0;'+(i<wasted.length-1?'border-bottom:1px solid #e8ddd0;':'');
+      if(tappable){
+        h+='<div onclick="openHistoryEdit(\''+x.hid+'\')" style="'+rowStyle+'cursor:pointer;">';
+      } else {
+        h+='<div style="'+rowStyle+'">';
+      }
+      h+='<div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:700;">'+esc(x.itemName)+(x.edited?' <span style="font-size:10px;color:#a08060;font-weight:400;">(edited)</span>':'')+'</div>';
       h+='<div style="font-size:12px;color:#b85c38;">'+x.portions+unitSuffix+' · '+time+'</div></div>';
+      if(tappable) h+='<div style="font-size:13px;color:#a08060;">›</div>';
       h+='</div>';
     });
     h+='</div>';
@@ -666,9 +837,16 @@ function renderToday(){
       var u=x.unit||(it?unitOf(it):'portions');
       var unitSuffix=u==='portions'?' portion'+(x.portions>1?'s':''):u;
       var time=new Date(x.date).toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'});
-      h+='<div style="display:flex;align-items:center;gap:12px;padding:10px 0;'+(i<prepped.length-1?'border-bottom:1px solid #e8ddd0;':'')+'">';
-      h+='<div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:700;">'+esc(x.itemName)+'</div>';
+      var tappable=!!x.hid;
+      var rowStyle='display:flex;align-items:center;gap:12px;padding:10px 0;'+(i<prepped.length-1?'border-bottom:1px solid #e8ddd0;':'');
+      if(tappable){
+        h+='<div onclick="openHistoryEdit(\''+x.hid+'\')" style="'+rowStyle+'cursor:pointer;">';
+      } else {
+        h+='<div style="'+rowStyle+'">';
+      }
+      h+='<div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:700;">'+esc(x.itemName)+(x.edited?' <span style="font-size:10px;color:#a08060;font-weight:400;">(edited)</span>':'')+'</div>';
       h+='<div style="font-size:12px;color:#7a9e7e;">'+x.portions+unitSuffix+' · '+time+'</div></div>';
+      if(tappable) h+='<div style="font-size:13px;color:#a08060;">›</div>';
       h+='</div>';
     });
     h+='</div>';
@@ -760,7 +938,7 @@ function handleImport(input){ if(input.files[0])importData(input.files[0]); }
 
 // ── Modal
 function renderModal(){
-  var m=S.modal, it=m.item;
+  var m=S.modal, it=m.item||null;
   var sheet='border-radius:20px 20px 0 0;padding:24px 24px calc(env(safe-area-inset-bottom) + 24px);width:100%;animation:slideUp 0.2s ease;background:#fff8f0;';
   var overlay='position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;display:flex;align-items:flex-end;animation:fadeIn 0.15s ease;';
   var h='<div style="'+overlay+'" onclick="if(event.target===this){S.modal=null;render();}">';
@@ -827,6 +1005,28 @@ function renderModal(){
     h+='<button onclick="S.modal=null;render();" style="'+cs.btnSecondary+'flex:1;">Cancel</button>';
     h+='<button onclick="confirmArchive(\''+it.id+'\');" style="'+cs.btnPrimary+'flex:1;">'+confirmLabel+'</button>';
     h+='</div></div>';
+
+  } else if(m.type==='edit-history'){
+    var entry=m.entry;
+    var hIt=S.items.filter(function(x){return x.id===entry.itemId;})[0];
+    var hU=entry.unit||(hIt?unitOf(hIt):'portions');
+    var hUSfx=hU==='portions'?'':hU;
+    var typeLabel=entry.type==='eat'?'eaten':entry.type==='waste'?'wasted':'prepped';
+    var titleIcon=entry.type==='eat'?'🍽':entry.type==='waste'?'🗑':'🥡';
+    h+='<div style="'+sheet+'">';
+    h+='<div style="font-size:18px;font-weight:700;margin-bottom:4px;">'+titleIcon+' Edit: '+esc(entry.itemName)+'</div>';
+    h+='<div style="color:#7a5c3a;font-size:13px;margin-bottom:16px;">Amount '+typeLabel+' — adjusts stock to match</div>';
+    h+='<label style="'+cs.label+'">Amount</label>';
+    h+='<div style="display:flex;align-items:baseline;gap:8px;">';
+    h+='<input id="hist-amt" type="number" inputmode="decimal" value="'+entry.portions+'" min="0.1" step="'+(hU==='portions'?'1':'10')+'" oninput="S.histEditAmount=this.value" style="'+cs.input+'flex:1;font-size:20px;font-weight:700;" />';
+    if(hUSfx) h+='<span style="font-size:16px;font-weight:700;color:#7a5c3a;">'+hUSfx+'</span>';
+    h+='</div>';
+    h+='<div style="display:flex;gap:10px;margin-top:20px;">';
+    h+='<button onclick="S.modal=null;render();" style="'+cs.btnSecondary+'flex:1;">Cancel</button>';
+    h+='<button onclick="saveHistoryEdit(\''+entry.hid+'\');" style="'+cs.btnPrimary+'flex:1;">Save</button>';
+    h+='</div>';
+    h+='<button onclick="deleteHistoryEntry(\''+entry.hid+'\');" style="background:transparent;border:1px dashed #b85c38;color:#b85c38;border-radius:10px;padding:10px;width:100%;font-size:13px;cursor:pointer;margin-top:12px;">Delete entry &amp; restore stock</button>';
+    h+='</div>';
 
   } else if(m.type==='edit'){
     var f=S.editForm;
