@@ -688,12 +688,14 @@ function renderLog(){
   var avail=S.items.filter(function(it){return it.portions>0 && !isArchived(it);});
   // Apply category filter (reuse S.filterCat, shared with Stock view)
   var filtered=S.filterCat==='All'?avail:avail.filter(function(it){return it.category===S.filterCat;});
-  // Sort by most stock first (using portion/totalPortion ratio for cross-unit fairness, fall back to raw portions)
+  // Sort by most stock first — raw portions primary, ratio as tiebreaker.
+  // Caveat: comparing portions across units (e.g. 500g vs 8 portions) isn't
+  // perfectly meaningful, but within the same unit it gives the expected order.
   filtered.sort(function(a,b){
-    var ra=a.totalPortions>0?a.portions/a.totalPortions:a.portions;
-    var rb=b.totalPortions>0?b.portions/b.totalPortions:b.portions;
-    if(rb!==ra) return rb-ra;
-    return b.portions-a.portions;
+    if(b.portions!==a.portions) return b.portions-a.portions;
+    var ra=a.totalPortions>0?a.portions/a.totalPortions:0;
+    var rb=b.totalPortions>0?b.portions/b.totalPortions:0;
+    return rb-ra;
   });
   var h='<div style="font-size:22px;font-weight:700;margin-bottom:6px;">Log a Meal</div>';
   h+='<div style="color:#7a5c3a;font-size:13px;margin-bottom:16px;">Tap an item to deduct from stock</div>';
