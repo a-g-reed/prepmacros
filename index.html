@@ -141,19 +141,21 @@ function updateSyncBar(){
 function addItem(){
   var f=S.form;
   if(!f.name.trim()||!f.portions)return;
-  var item={id:Date.now().toString(),name:f.name.trim(),category:f.category,unit:f.unit||'portions',portions:parseFloat(f.portions),totalPortions:parseFloat(f.portions),
+  var unit=f.unit||'portions';
+  var item={id:Date.now().toString(),name:f.name.trim(),category:f.category,unit:unit,portions:parseFloat(f.portions),totalPortions:parseFloat(f.portions),
     expiryDays:f.expiryDays?parseInt(f.expiryDays):null,
     macros:{cal:f.cal,protein:f.protein,carbs:f.carbs,fat:f.fat},notes:f.notes,prepDate:new Date().toISOString(),lastEaten:null};
   S.items.push(item);
-  S.history.unshift({type:'prep',itemId:item.id,itemName:item.name,portions:item.portions,date:new Date().toISOString()});
+  S.history.unshift({type:'prep',itemId:item.id,itemName:item.name,portions:item.portions,unit:unit,date:new Date().toISOString()});
   save(); S.form={name:'',category:'Protein',unit:'portions',portions:'',expiryDays:'',cal:'',protein:'',carbs:'',fat:'',notes:''}; S.view='stock'; render();
 }
 
 function restockItem(){
   var n=parseFloat(S.restockPortions); if(!n||!S.modal)return;
   var id=S.modal.item.id;
-  S.items=S.items.map(function(it){return it.id===id?{id:it.id,name:it.name,category:it.category,portions:it.portions+n,totalPortions:it.totalPortions+n,expiryDays:it.expiryDays,macros:it.macros,notes:it.notes,prepDate:new Date().toISOString(),lastEaten:it.lastEaten}:it;});
-  S.history.unshift({type:'prep',itemId:id,itemName:S.modal.item.name,portions:n,date:new Date().toISOString()});
+  var u=unitOf(S.modal.item);
+  S.items=S.items.map(function(it){return it.id===id?{id:it.id,name:it.name,category:it.category,unit:it.unit,portions:it.portions+n,totalPortions:it.totalPortions+n,expiryDays:it.expiryDays,macros:it.macros,notes:it.notes,prepDate:new Date().toISOString(),lastEaten:it.lastEaten}:it;});
+  S.history.unshift({type:'prep',itemId:id,itemName:S.modal.item.name,portions:n,unit:u,date:new Date().toISOString()});
   ['exp','expw','fgt'].forEach(function(p){delete S.dismissedAlerts[p+'-'+id];});
   save(); S.modal=null; S.restockPortions=1; render();
 }
@@ -161,21 +163,22 @@ function restockItem(){
 function logMeal(){
   if(!S.modal)return;
   var n=Math.min(S.logPortions,S.modal.item.portions); var id=S.modal.item.id;
-  S.items=S.items.map(function(it){return it.id===id?{id:it.id,name:it.name,category:it.category,portions:Math.max(0,it.portions-n),totalPortions:it.totalPortions,expiryDays:it.expiryDays,macros:it.macros,notes:it.notes,prepDate:it.prepDate,lastEaten:new Date().toISOString()}:it;});
-  S.history.unshift({type:'eat',itemId:id,itemName:S.modal.item.name,portions:n,date:new Date().toISOString()});
+  var u=unitOf(S.modal.item);
+  S.items=S.items.map(function(it){return it.id===id?{id:it.id,name:it.name,category:it.category,unit:it.unit,portions:Math.max(0,it.portions-n),totalPortions:it.totalPortions,expiryDays:it.expiryDays,macros:it.macros,notes:it.notes,prepDate:it.prepDate,lastEaten:new Date().toISOString()}:it;});
+  S.history.unshift({type:'eat',itemId:id,itemName:S.modal.item.name,portions:n,unit:u,date:new Date().toISOString()});
   delete S.dismissedAlerts['fgt-'+id];
   save(); S.modal=null; S.logPortions=1; render();
 }
 
 function removeItem(id){
   var it=S.items.filter(function(x){return x.id===id;})[0];
-  if(it)S.history.unshift({type:'deleted',itemId:id,itemName:it.name,portions:it.portions,date:new Date().toISOString()});
+  if(it)S.history.unshift({type:'deleted',itemId:id,itemName:it.name,portions:it.portions,unit:unitOf(it),date:new Date().toISOString()});
   S.items=S.items.filter(function(x){return x.id!==id;}); S.modal=null; save(); render();
 }
 
 function openEdit(id){
   var it=S.items.filter(function(x){return x.id===id;})[0]; if(!it)return;
-  S.editForm={id:id,name:it.name,category:it.category,expiryDays:it.expiryDays||'',
+  S.editForm={id:id,name:it.name,category:it.category,unit:unitOf(it),expiryDays:it.expiryDays||'',
     cal:(it.macros&&it.macros.cal)||'',protein:(it.macros&&it.macros.protein)||'',
     carbs:(it.macros&&it.macros.carbs)||'',fat:(it.macros&&it.macros.fat)||'',notes:it.notes||''};
   S.modal={type:'edit',item:it}; render();
@@ -185,7 +188,7 @@ function saveEdit(){
   var f=S.editForm; if(!f)return;
   S.items=S.items.map(function(it){
     if(it.id!==f.id)return it;
-    return {id:it.id,name:f.name.trim()||it.name,category:f.category,portions:it.portions,totalPortions:it.totalPortions,
+    return {id:it.id,name:f.name.trim()||it.name,category:f.category,unit:f.unit||it.unit||'portions',portions:it.portions,totalPortions:it.totalPortions,
       expiryDays:f.expiryDays?parseInt(f.expiryDays):null,macros:{cal:f.cal,protein:f.protein,carbs:f.carbs,fat:f.fat},
       notes:f.notes,prepDate:it.prepDate,lastEaten:it.lastEaten};
   });
@@ -195,9 +198,10 @@ function saveEdit(){
 function wastePortions(){
   if(!S.modal)return;
   var n=Math.min(S.wastePortions,S.modal.item.portions); var id=S.modal.item.id;
+  var u=unitOf(S.modal.item);
   var wasAll=S.modal.item.portions-n<=0;
-  S.items=S.items.map(function(it){return it.id===id?{id:it.id,name:it.name,category:it.category,portions:Math.max(0,it.portions-n),totalPortions:it.totalPortions,expiryDays:it.expiryDays,macros:it.macros,notes:it.notes,prepDate:it.prepDate,lastEaten:it.lastEaten}:it;});
-  S.history.unshift({type:'waste',itemId:id,itemName:S.modal.item.name,portions:n,date:new Date().toISOString()});
+  S.items=S.items.map(function(it){return it.id===id?{id:it.id,name:it.name,category:it.category,unit:it.unit,portions:Math.max(0,it.portions-n),totalPortions:it.totalPortions,expiryDays:it.expiryDays,macros:it.macros,notes:it.notes,prepDate:it.prepDate,lastEaten:it.lastEaten}:it;});
+  S.history.unshift({type:'waste',itemId:id,itemName:S.modal.item.name,portions:n,unit:u,date:new Date().toISOString()});
   if(wasAll)S.items=S.items.filter(function(it){return it.id!==id;});
   save(); S.modal=null; S.wastePortions=1; render();
 }
@@ -521,7 +525,7 @@ function renderHistory(){
     grouped[day].forEach(function(x){
       var icon=x.type==='eat'?'🍽':x.type==='waste'?'🗑':x.type==='deleted'?'❌':'🥡';
       var it=S.items.filter(function(z){return z.id===x.itemId;})[0];
-      var u=it?unitOf(it):'portions';
+      var u=x.unit||(it?unitOf(it):'portions');
       var unitSuffix=u==='portions'?' portion'+(x.portions>1?'s':''):u;
       var meta=x.type==='eat'?'Ate '+x.portions+unitSuffix:x.type==='waste'?'Wasted '+x.portions+unitSuffix:x.type==='deleted'?'Removed from stock':'Prepped '+x.portions+unitSuffix;
       h+='<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid #e8ddd0;">';
@@ -591,9 +595,8 @@ function renderModal(){
     h+='<div style="'+sheet+'">';
     h+='<div style="font-size:18px;font-weight:700;margin-bottom:4px;">Log: '+esc(it.name)+'</div>';
     h+='<div style="color:#7a5c3a;font-size:13px;margin-bottom:16px;">'+availTxt+'</div>';
-    h+=stepperHTML('logPortions',n,unitStep(u),it.portions,u);
-    var macros=macroFor(it,n);
-    if(macros) h+='<div style="background:#f0e6d4;border-radius:8px;padding:10px 14px;margin-top:14px;font-size:13px;color:#5a3e2a;">~'+Math.round(macros.cal)+' cal · '+Math.round(macros.protein)+'g protein · '+Math.round(macros.carbs)+'g carbs · '+Math.round(macros.fat)+'g fat</div>';
+    h+=stepperHTML('logPortions',n,unitStep(u),it.portions,u,it);
+    h+='<div id="macro-preview" style="margin-top:14px;">'+macroPreviewHTML(it,n)+'</div>';
     h+='<div style="display:flex;gap:10px;margin-top:16px;">';
     h+='<button onclick="S.modal=null;render();" style="'+cs.btnSecondary+'flex:1;">Cancel</button>';
     h+='<button onclick="logMeal();" style="'+cs.btnPrimary+'flex:1;">Log It</button>';
@@ -634,14 +637,21 @@ function renderModal(){
 
   } else if(m.type==='edit'){
     var f=S.editForm;
-    var u=unitOf(it);
+    var u=f.unit||unitOf(it);
     var macroLbl=u==='portions'?'Macros per portion':'Macros per 100'+u;
     h+='<div style="'+sheet+'max-height:85vh;overflow-y:auto;">';
     h+='<div style="font-size:18px;font-weight:700;margin-bottom:14px;">Edit: '+esc(it.name)+'</div>';
     h+='<label style="'+cs.label+'">Name</label><input id="e-name" style="'+cs.input+'" value="'+esc(f.name)+'" />';
-    h+='<label style="'+cs.label+'">Category</label><select id="e-cat" style="'+cs.input+'">';
+    h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">';
+    h+='<div><label style="'+cs.label+'">Category</label><select id="e-cat" style="'+cs.input+'">';
     CATS.filter(function(c){return c!=='All';}).forEach(function(c){h+='<option'+(f.category===c?' selected':'')+'>'+c+'</option>';});
-    h+='</select>';
+    h+='</select></div>';
+    h+='<div><label style="'+cs.label+'">Measured in</label><select id="e-unit" onchange="S.editForm.unit=this.value;collectEditForm();render();" style="'+cs.input+'">';
+    [['portions','Portions'],['g','Grams (g)'],['ml','Millilitres (ml)']].forEach(function(opt){
+      h+='<option value="'+opt[0]+'"'+(u===opt[0]?' selected':'')+'>'+opt[1]+'</option>';
+    });
+    h+='</select></div>';
+    h+='</div>';
     h+='<label style="'+cs.label+'">Expires after (days)</label><input id="e-expiry" type="number" inputmode="decimal" style="'+cs.input+'" value="'+esc(f.expiryDays)+'" placeholder="e.g. 5" min="1" />';
     h+='<div style="font-size:14px;font-weight:700;margin:16px 0 2px;color:#5a3e2a;">'+macroLbl+'</div>';
     h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">';
@@ -660,25 +670,46 @@ function renderModal(){
   return h;
 }
 
-function stepperHTML(field,val,step,max,unit){
+function macroPreviewHTML(it,n){
+  var m=macroFor(it,n);
+  if(!m)return '';
+  return '<div style="background:#f0e6d4;border-radius:8px;padding:10px 14px;font-size:13px;color:#5a3e2a;">~'+Math.round(m.cal)+' cal · '+Math.round(m.protein)+'g protein · '+Math.round(m.carbs)+'g carbs · '+Math.round(m.fat)+'g fat</div>';
+}
+
+function stepperHTML(field,val,step,max,unit,item){
   var suffix=unit&&unit!=='portions'?unit:'';
+  var itemRef=item?',\''+item.id+'\'':'';
   return '<div style="display:flex;align-items:center;gap:16px;justify-content:center;">'+
-    '<button onclick="S.'+field+'=Math.max('+step+',S.'+field+'-'+step+');render();" style="width:44px;height:44px;border-radius:10px;border:1px solid #c8b89a;background:transparent;font-size:22px;cursor:pointer;flex-shrink:0;">&minus;</button>'+
+    '<button onclick="stepperNudge(\''+field+'\','+(-step)+','+step+','+max+itemRef+')" style="width:44px;height:44px;border-radius:10px;border:1px solid #c8b89a;background:transparent;font-size:22px;cursor:pointer;flex-shrink:0;">&minus;</button>'+
     '<div style="display:flex;align-items:baseline;">'+
-      '<input type="number" inputmode="decimal" value="'+val+'" min="1" max="'+max+'" onchange="onStepperInput(\''+field+'\',this.value,'+max+')" oninput="onStepperInput(\''+field+'\',this.value,'+max+')" style="font-size:28px;font-weight:700;width:80px;text-align:center;border:none;background:transparent;color:#3d2b1a;-webkit-appearance:none;outline:none;padding:0;font-family:inherit;" />'+
+      '<input type="number" inputmode="decimal" value="'+val+'" min="1" max="'+max+'" oninput="onStepperInput(\''+field+'\',this.value,'+max+itemRef+')" style="font-size:28px;font-weight:700;width:80px;text-align:center;border:none;background:transparent;color:#3d2b1a;-webkit-appearance:none;outline:none;padding:0;font-family:inherit;" />'+
       (suffix?'<span style="font-size:18px;font-weight:700;color:#7a5c3a;margin-left:2px;">'+suffix+'</span>':'')+
     '</div>'+
-    '<button onclick="S.'+field+'=Math.min('+max+',S.'+field+'+'+step+');render();" style="width:44px;height:44px;border-radius:10px;border:1px solid #c8b89a;background:transparent;font-size:22px;cursor:pointer;flex-shrink:0;">+</button>'+
+    '<button onclick="stepperNudge(\''+field+'\','+step+','+step+','+max+itemRef+')" style="width:44px;height:44px;border-radius:10px;border:1px solid #c8b89a;background:transparent;font-size:22px;cursor:pointer;flex-shrink:0;">+</button>'+
     '</div>';
 }
 
-function onStepperInput(field, val, max) {
-  var n = parseFloat(val);
-  if (isNaN(n) || n < 1) return; // allow the user to finish typing; don't override
-  S[field] = Math.min(max, n);
+function stepperNudge(field, delta, step, max, itemId) {
+  S[field] = Math.max(step, Math.min(max, S[field] + delta));
+  render();
 }
 
-function collectAndSaveEdit(){
+function onStepperInput(field, val, max, itemId) {
+  var n = parseFloat(val);
+  if (isNaN(n) || n < 1) return; // let user keep typing
+  S[field] = Math.min(max, n);
+  // If we have an item ref and there's a macro preview, update live without full re-render
+  if (itemId) {
+    var preview = ge('macro-preview');
+    if (preview) {
+      var it = S.items.filter(function(x){return x.id===itemId;})[0];
+      if (it) preview.innerHTML = macroPreviewHTML(it, S[field]);
+    }
+  }
+}
+
+function collectEditForm(){
+  if(!S.editForm)return;
   S.editForm.name=ge('e-name')?ge('e-name').value:S.editForm.name;
   S.editForm.category=ge('e-cat')?ge('e-cat').value:S.editForm.category;
   S.editForm.expiryDays=ge('e-expiry')?ge('e-expiry').value:S.editForm.expiryDays;
@@ -687,6 +718,10 @@ function collectAndSaveEdit(){
   S.editForm.carbs=ge('e-carbs')?ge('e-carbs').value:S.editForm.carbs;
   S.editForm.fat=ge('e-fat')?ge('e-fat').value:S.editForm.fat;
   S.editForm.notes=ge('e-notes')?ge('e-notes').value:S.editForm.notes;
+}
+
+function collectAndSaveEdit(){
+  collectEditForm();
   saveEdit();
 }
 
