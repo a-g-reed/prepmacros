@@ -41,6 +41,7 @@ var S = {
   dismissedAlerts:{}, view:'stock', filterCat:'All', expandedId:null,
   modal:null, logPortions:1, restockPortions:1, wastePortions:1, editForm:null,
   syncStatus:'syncing', syncMsg:'Loading\u2026',
+  showArchived:false, stockFilter:'all',
   form:{name:'',category:'Protein',unit:'portions',portions:'',expiryDays:'',cal:'',protein:'',carbs:'',fat:'',notes:''}
 };
 
@@ -51,9 +52,12 @@ function daysAgo(d){ var n=daysSince(d); if(n===null)return null; if(n===0)retur
 function todayStr(){ return new Date().toISOString().split('T')[0]; }
 function barColor(p){ return p>0.5?'#7a9e7e':p>0.25?'#c4a84b':'#b85c38'; }
 function isDismissedToday(k){ return S.dismissedAlerts[k]===todayStr(); }
-function totP(){ return S.items.reduce(function(s,it){return s+it.portions;},0); }
-function lowC(){ return S.items.filter(function(it){return it.portions>0&&it.portions<=S.settings.lowStockThreshold;}).length; }
-function outC(){ return S.items.filter(function(it){return it.portions===0;}).length; }
+function isArchived(it){ return !!it.archived; }
+function activeItems(){ return S.items.filter(function(it){return !isArchived(it);}); }
+function totP(){ return activeItems().reduce(function(s,it){return s+it.portions;},0); }
+function lowC(){ return activeItems().filter(function(it){return it.portions>0&&it.portions<=S.settings.lowStockThreshold;}).length; }
+function outC(){ return activeItems().filter(function(it){return it.portions===0;}).length; }
+function archivedC(){ return S.items.filter(isArchived).length; }
 function ge(id){ return document.getElementById(id); }
 
 // Unit helpers
@@ -90,7 +94,7 @@ function todayMacros(){
 function getAlerts(){
   var alerts=[];
   S.items.forEach(function(it){
-    if(it.portions===0)return;
+    if(it.portions===0||isArchived(it))return;
     var expDays=it.expiryDays!=null?it.expiryDays:S.settings.expiryDays;
     var age=daysSince(it.prepDate);
     if(expDays&&age!==null){
@@ -154,7 +158,7 @@ function restockItem(){
   var n=parseFloat(S.restockPortions); if(!n||!S.modal)return;
   var id=S.modal.item.id;
   var u=unitOf(S.modal.item);
-  S.items=S.items.map(function(it){return it.id===id?{id:it.id,name:it.name,category:it.category,unit:it.unit,portions:it.portions+n,totalPortions:it.totalPortions+n,expiryDays:it.expiryDays,macros:it.macros,notes:it.notes,prepDate:new Date().toISOString(),lastEaten:it.lastEaten}:it;});
+  S.items=S.items.map(function(it){return it.id===id?{id:it.id,name:it.name,category:it.category,unit:it.unit,portions:it.portions+n,totalPortions:it.totalPortions+n,expiryDays:it.expiryDays,macros:it.macros,notes:it.notes,prepDate:new Date().toISOString(),lastEaten:it.lastEaten,archived:false}:it;});
   S.history.unshift({type:'prep',itemId:id,itemName:S.modal.item.name,portions:n,unit:u,date:new Date().toISOString()});
   ['exp','expw','fgt'].forEach(function(p){delete S.dismissedAlerts[p+'-'+id];});
   save(); S.modal=null; S.restockPortions=1; render();
@@ -164,7 +168,7 @@ function logMeal(){
   if(!S.modal)return;
   var n=Math.min(S.logPortions,S.modal.item.portions); var id=S.modal.item.id;
   var u=unitOf(S.modal.item);
-  S.items=S.items.map(function(it){return it.id===id?{id:it.id,name:it.name,category:it.category,unit:it.unit,portions:Math.max(0,it.portions-n),totalPortions:it.totalPortions,expiryDays:it.expiryDays,macros:it.macros,notes:it.notes,prepDate:it.prepDate,lastEaten:new Date().toISOString()}:it;});
+  S.items=S.items.map(function(it){return it.id===id?{id:it.id,name:it.name,category:it.category,unit:it.unit,portions:Math.max(0,it.portions-n),totalPortions:it.totalPortions,expiryDays:it.expiryDays,macros:it.macros,notes:it.notes,prepDate:it.prepDate,lastEaten:new Date().toISOString(),archived:it.archived}:it;});
   S.history.unshift({type:'eat',itemId:id,itemName:S.modal.item.name,portions:n,unit:u,date:new Date().toISOString()});
   delete S.dismissedAlerts['fgt-'+id];
   save(); S.modal=null; S.logPortions=1; render();
@@ -174,6 +178,27 @@ function removeItem(id){
   var it=S.items.filter(function(x){return x.id===id;})[0];
   if(it)S.history.unshift({type:'deleted',itemId:id,itemName:it.name,portions:it.portions,unit:unitOf(it),date:new Date().toISOString()});
   S.items=S.items.filter(function(x){return x.id!==id;}); S.modal=null; save(); render();
+}
+
+function toggleArchive(id){
+  S.items=S.items.map(function(it){
+    if(it.id!==id)return it;
+    return {id:it.id,name:it.name,category:it.category,unit:it.unit,portions:it.portions,totalPortions:it.totalPortions,expiryDays:it.expiryDays,macros:it.macros,notes:it.notes,prepDate:it.prepDate,lastEaten:it.lastEaten,archived:!isArchived(it)};
+  });
+  save(); render();
+}
+
+function openArchiveConfirm(id){
+  var it=S.items.filter(function(x){return x.id===id;})[0]; if(!it)return;
+  S.modal={type:'confirm-archive',item:it};
+  render();
+}
+
+function confirmArchive(id){
+  toggleArchive(id);
+  S.modal=null;
+  S.editForm=null;
+  render();
 }
 
 function openEdit(id){
@@ -190,7 +215,7 @@ function saveEdit(){
     if(it.id!==f.id)return it;
     return {id:it.id,name:f.name.trim()||it.name,category:f.category,unit:f.unit||it.unit||'portions',portions:it.portions,totalPortions:it.totalPortions,
       expiryDays:f.expiryDays?parseInt(f.expiryDays):null,macros:{cal:f.cal,protein:f.protein,carbs:f.carbs,fat:f.fat},
-      notes:f.notes,prepDate:it.prepDate,lastEaten:it.lastEaten};
+      notes:f.notes,prepDate:it.prepDate,lastEaten:it.lastEaten,archived:it.archived};
   });
   save(); S.modal=null; S.editForm=null; render();
 }
@@ -200,7 +225,7 @@ function wastePortions(){
   var n=Math.min(S.wastePortions,S.modal.item.portions); var id=S.modal.item.id;
   var u=unitOf(S.modal.item);
   var wasAll=S.modal.item.portions-n<=0;
-  S.items=S.items.map(function(it){return it.id===id?{id:it.id,name:it.name,category:it.category,unit:it.unit,portions:Math.max(0,it.portions-n),totalPortions:it.totalPortions,expiryDays:it.expiryDays,macros:it.macros,notes:it.notes,prepDate:it.prepDate,lastEaten:it.lastEaten}:it;});
+  S.items=S.items.map(function(it){return it.id===id?{id:it.id,name:it.name,category:it.category,unit:it.unit,portions:Math.max(0,it.portions-n),totalPortions:it.totalPortions,expiryDays:it.expiryDays,macros:it.macros,notes:it.notes,prepDate:it.prepDate,lastEaten:it.lastEaten,archived:it.archived}:it;});
   S.history.unshift({type:'waste',itemId:id,itemName:S.modal.item.name,portions:n,unit:u,date:new Date().toISOString()});
   if(wasAll)S.items=S.items.filter(function(it){return it.id!==id;});
   save(); S.modal=null; S.wastePortions=1; render();
@@ -262,8 +287,8 @@ function render(){
   header+='<div><div style="font-size:20px;font-weight:700;color:#f0d9b5;">PrepMacros</div><div style="font-size:10px;color:#c8a96e;letter-spacing:1.5px;text-transform:uppercase;">Stock Tracker</div></div>';
   header+='<div style="display:flex;gap:6px;">';
   if(macros) header+='<div style="background:rgba(255,255,255,0.1);border-radius:20px;padding:4px 10px;text-align:center;"><div style="font-size:14px;font-weight:700;color:#c8a96e;">'+macros.cal+'</div><div style="font-size:9px;color:#c8b89a;text-transform:uppercase;">Cal today</div></div>';
-  if(low)header+='<div style="background:rgba(255,255,255,0.1);border-radius:20px;padding:4px 10px;text-align:center;"><div style="font-size:14px;font-weight:700;color:#d4a843;">'+low+'</div><div style="font-size:9px;color:#c8b89a;text-transform:uppercase;">Low</div></div>';
-  if(out)header+='<div style="background:rgba(255,255,255,0.1);border-radius:20px;padding:4px 10px;text-align:center;"><div style="font-size:14px;font-weight:700;color:#b85c38;">'+out+'</div><div style="font-size:9px;color:#c8b89a;text-transform:uppercase;">Out</div></div>';
+  if(low)header+='<button onclick="jumpToLowStock()" style="background:rgba(255,255,255,0.1);border:none;border-radius:20px;padding:4px 10px;text-align:center;cursor:pointer;"><div style="font-size:14px;font-weight:700;color:#d4a843;">'+low+'</div><div style="font-size:9px;color:#c8b89a;text-transform:uppercase;">Low</div></button>';
+  if(out)header+='<button onclick="jumpToOutStock()" style="background:rgba(255,255,255,0.1);border:none;border-radius:20px;padding:4px 10px;text-align:center;cursor:pointer;"><div style="font-size:14px;font-weight:700;color:#b85c38;">'+out+'</div><div style="font-size:9px;color:#c8b89a;text-transform:uppercase;">Out</div></button>';
   if(alerts.length)header+='<div style="background:rgba(255,255,255,0.1);border-radius:20px;padding:4px 10px;text-align:center;"><div style="font-size:14px;font-weight:700;color:#e0a030;">'+alerts.length+'</div><div style="font-size:9px;color:#c8b89a;text-transform:uppercase;">Alerts</div></div>';
   header+='</div></div>';
 
@@ -292,8 +317,8 @@ function render(){
   }
 
   // Nav
-  header+='<div style="display:flex;gap:5px;padding:8px 0 10px;">';
-  var navItems=[['stock','📦 Stock'],['add','+ Add'],['log','🍽 Log'],['history','📋 Hist'],['settings','⚙️']];
+  header+='<div style="display:flex;gap:4px;padding:8px 0 10px;">';
+  var navItems=[['stock','📦'],['add','+ Add'],['log','🍽 Log'],['today','📅 Today'],['history','📋'],['settings','⚙️']];
   navItems.forEach(function(v){
     var active=S.view===v[0];
     header+='<button onclick="setView(\''+v[0]+'\')" style="flex:1;padding:7px 2px;border-radius:8px;border:none;font-size:11px;cursor:pointer;background:'+(active?'#c8a96e':'rgba(255,255,255,0.08)')+';color:'+(active?'#3d2b1a':'#d4c4a8')+';font-weight:'+(active?'700':'400')+';">'+v[1]+'</button>';
@@ -305,6 +330,7 @@ function render(){
   if(S.view==='stock') main+=renderStock();
   else if(S.view==='add') main+=renderAdd();
   else if(S.view==='log') main+=renderLog();
+  else if(S.view==='today') main+=renderToday();
   else if(S.view==='history') main+=renderHistory();
   else if(S.view==='settings') main+=renderSettings();
   main+='</div>';
@@ -316,35 +342,80 @@ function render(){
   app.innerHTML=header+main+modal;
 }
 
-function setView(v){ S.view=v; render(); }
+function setView(v){
+  // Clear the stock filter when moving away from stock view
+  if(v!=='stock') S.stockFilter='all';
+  S.view=v;
+  render();
+}
+function jumpToLowStock(){ S.stockFilter='low'; S.view='stock'; S.filterCat='All'; render(); }
+function jumpToOutStock(){ S.stockFilter='out'; S.view='stock'; S.filterCat='All'; render(); }
 function dismissAlert(key){ S.dismissedAlerts[key]=todayStr(); save(); render(); }
 function toggleExpand(id){ S.expandedId=S.expandedId===id?null:id; render(); }
 
 // ── Stock view
 function renderStock(){
-  var items=S.filterCat==='All'?S.items:S.items.filter(function(it){return it.category===S.filterCat;});
+  // Archived items are never shown in stock unless the showArchived toggle is on
+  var baseItems=S.showArchived?S.items.filter(isArchived):S.items.filter(function(it){return !isArchived(it);});
 
-  var h='<div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:14px;">';
-  CATS.forEach(function(c){
-    var active=S.filterCat===c;
-    // Count items in category (not portions since units differ)
-    var count=c==='All'?S.items.length:S.items.filter(function(it){return it.category===c;}).length;
-    var badgeBg=active?'rgba(240,217,181,0.25)':'#f0e6d4';
-    var badgeColor=active?'#f0d9b5':'#7a5c3a';
-    var badge=count>0?'<span style="background:'+badgeBg+';border-radius:10px;padding:1px 7px;margin-left:6px;font-size:11px;font-weight:700;color:'+badgeColor+';">'+count+'</span>':'';
-    h+='<button onclick="S.filterCat=\''+c+'\';render();" style="padding:5px 12px;border-radius:20px;white-space:nowrap;font-size:12px;border:'+(active?'none':'1px solid #e8ddd0')+';background:'+(active?'#3d2b1a':'transparent')+';color:'+(active?'#f0d9b5':'#7a5c3a')+';display:inline-flex;align-items:center;">'+c+badge+'</button>';
-  });
-  h+='</div>';
+  // Apply category filter
+  var items=S.filterCat==='All'?baseItems:baseItems.filter(function(it){return it.category===S.filterCat;});
+
+  // Apply stock filter (from Low/Out badge tap)
+  if(!S.showArchived){
+    if(S.stockFilter==='low') items=items.filter(function(it){return it.portions>0&&it.portions<=S.settings.lowStockThreshold;});
+    else if(S.stockFilter==='out') items=items.filter(function(it){return it.portions===0;});
+  }
+
+  var h='';
+
+  // Archived banner + toggle
+  var archCount=archivedC();
+  if(S.showArchived){
+    h+='<div style="background:#f0e6d4;border-radius:10px;padding:10px 14px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;">';
+    h+='<div style="font-size:13px;color:#5a3e2a;"><strong>Viewing archived</strong> ('+archCount+' item'+(archCount!==1?'s':'')+')</div>';
+    h+='<button onclick="S.showArchived=false;render();" style="background:#3d2b1a;color:#f0d9b5;border:none;border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;">Back to stock</button>';
+    h+='</div>';
+  }
+
+  // Stock filter banner (when viewing low/out via badge tap)
+  if(!S.showArchived && S.stockFilter!=='all'){
+    var label=S.stockFilter==='low'?'Showing low-stock items':'Showing out-of-stock items';
+    h+='<div style="background:#fdf6e3;border-radius:10px;padding:10px 14px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;">';
+    h+='<div style="font-size:13px;color:#5a4010;">'+label+'</div>';
+    h+='<button onclick="S.stockFilter=\'all\';render();" style="background:transparent;border:1px solid #c8b89a;color:#5a4010;border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;">Show all</button>';
+    h+='</div>';
+  }
+
+  // Category filter pills (only shown when not viewing archived and no stock filter)
+  if(!S.showArchived && S.stockFilter==='all'){
+    h+='<div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:14px;">';
+    CATS.forEach(function(c){
+      var active=S.filterCat===c;
+      var count=c==='All'?activeItems().length:activeItems().filter(function(it){return it.category===c;}).length;
+      var badgeBg=active?'rgba(240,217,181,0.25)':'#f0e6d4';
+      var badgeColor=active?'#f0d9b5':'#7a5c3a';
+      var badge=count>0?'<span style="background:'+badgeBg+';border-radius:10px;padding:1px 7px;margin-left:6px;font-size:11px;font-weight:700;color:'+badgeColor+';">'+count+'</span>':'';
+      h+='<button onclick="S.filterCat=\''+c+'\';render();" style="padding:5px 12px;border-radius:20px;white-space:nowrap;font-size:12px;border:'+(active?'none':'1px solid #e8ddd0')+';background:'+(active?'#3d2b1a':'transparent')+';color:'+(active?'#f0d9b5':'#7a5c3a')+';display:inline-flex;align-items:center;">'+c+badge+'</button>';
+    });
+    h+='</div>';
+  }
 
   if(!items.length){
     h+='<div style="text-align:center;padding:48px 20px;color:#a08060;">';
-    h+='<div style="font-size:40px;margin-bottom:12px;">🥡</div>';
-    h+='<div style="font-size:18px;font-weight:700;margin-bottom:6px;color:#7a5c3a;">No items yet</div>';
-    h+='<div style="font-size:13px;">Tap &quot;+ Add&quot; to log your first prep batch</div></div>';
-    return h;
+    h+='<div style="font-size:40px;margin-bottom:12px;">'+(S.showArchived?'📦':'🥡')+'</div>';
+    h+='<div style="font-size:18px;font-weight:700;margin-bottom:6px;color:#7a5c3a;">'+(S.showArchived?'No archived items':(S.stockFilter==='low'?'Nothing low':(S.stockFilter==='out'?'Nothing out of stock':'No items yet')))+'</div>';
+    if(!S.showArchived && S.stockFilter==='all') h+='<div style="font-size:13px;">Tap &quot;+ Add&quot; to log your first prep batch</div>';
+    h+='</div>';
+  } else {
+    items.forEach(function(it){ h+=renderCard(it); });
   }
 
-  items.forEach(function(it){ h+=renderCard(it); });
+  // Archive access footer (only on default stock view)
+  if(!S.showArchived && S.stockFilter==='all' && archCount>0){
+    h+='<button onclick="S.showArchived=true;S.expandedId=null;render();" style="background:transparent;border:1px dashed #c8b89a;color:#7a5c3a;border-radius:10px;padding:10px;width:100%;font-size:13px;cursor:pointer;margin-top:16px;">📁 View archived ('+archCount+')</button>';
+  }
+
   return h;
 }
 
@@ -401,14 +472,25 @@ function renderCard(it){
       h+='</div>';
     }
     if(it.notes) h+='<div style="font-size:12px;color:#7a5c3a;margin-bottom:10px;font-style:italic;">&quot;'+esc(it.notes)+'&quot;</div>';
-    if(expDays) h+='<div style="font-size:12px;color:#a08060;margin-bottom:10px;">Expiry: '+expDays+' days &middot; '+(isExp?'<span style="color:#b85c38;font-weight:700;">Expired</span>':(expDays-age)+'d remaining')+'</div>';
-    h+='<div style="display:flex;gap:8px;">';
-    h+='<button onclick="openLogModal(\''+it.id+'\')" '+(oos?'disabled':'')+' style="'+cs.btnPrimary+'flex:1;opacity:'+(oos?0.4:1)+';">🍽 Eat</button>';
-    h+='<button onclick="openRestockModal(\''+it.id+'\')" style="'+cs.btnSecondary+'flex:1;">🥡 Restock</button>';
-    h+='<button onclick="openWasteModal(\''+it.id+'\')" '+(oos?'disabled':'')+' style="'+cs.btnSecondary+'flex:1;opacity:'+(oos?0.4:1)+';">🗑 Waste</button>';
-    h+='<button onclick="openEdit(\''+it.id+'\')" style="'+cs.btnSecondary+'padding:8px 10px;">✏️</button>';
-    h+='<button onclick="openRemoveModal(\''+it.id+'\')" style="'+cs.btnDanger+'">✕</button>';
-    h+='</div></div>';
+    if(expDays&&!isArchived(it)) h+='<div style="font-size:12px;color:#a08060;margin-bottom:10px;">Expiry: '+expDays+' days &middot; '+(isExp?'<span style="color:#b85c38;font-weight:700;">Expired</span>':(expDays-age)+'d remaining')+'</div>';
+
+    if(isArchived(it)){
+      // Archived items get a simpler action row
+      h+='<div style="display:flex;gap:8px;">';
+      h+='<button onclick="openArchiveConfirm(\''+it.id+'\')" style="'+cs.btnPrimary+'flex:1;">📤 Unarchive</button>';
+      h+='<button onclick="openEdit(\''+it.id+'\')" style="'+cs.btnSecondary+'padding:8px 10px;">✏️</button>';
+      h+='<button onclick="openRemoveModal(\''+it.id+'\')" style="'+cs.btnDanger+'">✕</button>';
+      h+='</div>';
+    } else {
+      h+='<div style="display:flex;gap:8px;">';
+      h+='<button onclick="openLogModal(\''+it.id+'\')" '+(oos?'disabled':'')+' style="'+cs.btnPrimary+'flex:1;opacity:'+(oos?0.4:1)+';">🍽 Eat</button>';
+      h+='<button onclick="openRestockModal(\''+it.id+'\')" style="'+cs.btnSecondary+'flex:1;">🥡 Restock</button>';
+      h+='<button onclick="openWasteModal(\''+it.id+'\')" '+(oos?'disabled':'')+' style="'+cs.btnSecondary+'flex:1;opacity:'+(oos?0.4:1)+';">🗑 Waste</button>';
+      h+='<button onclick="openEdit(\''+it.id+'\')" style="'+cs.btnSecondary+'padding:8px 10px;">✏️</button>';
+      h+='<button onclick="openRemoveModal(\''+it.id+'\')" style="'+cs.btnDanger+'">✕</button>';
+      h+='</div>';
+    }
+    h+='</div>';
   }
 
   h+='</div>';
@@ -474,7 +556,14 @@ function collectAndAdd(){
 
 // ── Log view
 function renderLog(){
-  var avail=S.items.filter(function(it){return it.portions>0;});
+  var avail=S.items.filter(function(it){return it.portions>0 && !isArchived(it);});
+  // Sort by most stock first (using portion/totalPortion ratio for cross-unit fairness, fall back to raw portions)
+  avail.sort(function(a,b){
+    var ra=a.totalPortions>0?a.portions/a.totalPortions:a.portions;
+    var rb=b.totalPortions>0?b.portions/b.totalPortions:b.portions;
+    if(rb!==ra) return rb-ra;
+    return b.portions-a.portions;
+  });
   var h='<div style="font-size:22px;font-weight:700;margin-bottom:6px;">Log a Meal</div>';
   h+='<div style="color:#7a5c3a;font-size:13px;margin-bottom:20px;">Tap an item to deduct a portion from stock</div>';
   if(!avail.length){
@@ -496,6 +585,95 @@ function renderLog(){
     h+='<div style="background:#3d2b1a;color:#f0d9b5;border-radius:20px;padding:4px 14px;font-size:14px;font-weight:700;flex-shrink:0;">'+it.portions+(u==='portions'?'':u)+'</div>';
     h+='</button>';
   });
+  return h;
+}
+
+// ── Today view
+function renderToday(){
+  var t=todayStr();
+  var todays=S.history.filter(function(x){return x.date&&x.date.indexOf(t)===0;});
+  var macros=todayMacros();
+  var h='<div style="font-size:22px;font-weight:700;margin-bottom:6px;">Today</div>';
+  h+='<div style="color:#7a5c3a;font-size:13px;margin-bottom:16px;">'+new Date().toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'})+'</div>';
+
+  // Macro summary card (only if ate something)
+  if(macros){
+    h+='<div style="background:#fff8f0;border:1px solid #e0d0ba;border-radius:14px;padding:16px;margin-bottom:20px;">';
+    h+='<div style="font-size:11px;color:#a08060;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;">Consumed today</div>';
+    h+='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">';
+    [['Cal',macros.cal],['Protein',macros.protein+'g'],['Carbs',macros.carbs+'g'],['Fat',macros.fat+'g']].forEach(function(m){
+      h+='<div style="background:#f0e6d4;border-radius:8px;padding:10px 4px;text-align:center;">';
+      h+='<div style="font-size:16px;font-weight:700;color:#3d2b1a;">'+m[1]+'</div>';
+      h+='<div style="font-size:10px;color:#a08060;text-transform:uppercase;">'+m[0]+'</div></div>';
+    });
+    h+='</div></div>';
+  }
+
+  // Split activity by type
+  var ate=todays.filter(function(x){return x.type==='eat';});
+  var wasted=todays.filter(function(x){return x.type==='waste';});
+  var prepped=todays.filter(function(x){return x.type==='prep';});
+
+  if(!todays.length){
+    h+='<div style="text-align:center;padding:48px 20px;color:#a08060;">';
+    h+='<div style="font-size:40px;margin-bottom:12px;">🌱</div>';
+    h+='<div style="font-size:18px;font-weight:700;margin-bottom:6px;color:#7a5c3a;">Nothing logged yet</div>';
+    h+='<div style="font-size:13px;">Head to Log to record a meal</div></div>';
+    return h;
+  }
+
+  // Section: Meals eaten
+  if(ate.length){
+    h+='<div style="font-size:11px;font-weight:700;color:#7a5c3a;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px;">🍽 Meals ('+ate.length+')</div>';
+    h+='<div style="background:#fff8f0;border-radius:12px;border:1px solid #e0d0ba;padding:0 14px;margin-bottom:16px;">';
+    ate.forEach(function(x,i){
+      var it=S.items.filter(function(z){return z.id===x.itemId;})[0];
+      var u=x.unit||(it?unitOf(it):'portions');
+      var unitSuffix=u==='portions'?' portion'+(x.portions>1?'s':''):u;
+      var m=it?macroFor(it,x.portions):null;
+      var time=new Date(x.date).toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'});
+      h+='<div style="display:flex;align-items:center;gap:12px;padding:10px 0;'+(i<ate.length-1?'border-bottom:1px solid #e8ddd0;':'')+'">';
+      h+='<div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:700;">'+esc(x.itemName)+'</div>';
+      h+='<div style="font-size:12px;color:#7a5c3a;">'+x.portions+unitSuffix+(m?' · '+Math.round(m.cal)+' cal':'')+' · '+time+'</div></div>';
+      h+='</div>';
+    });
+    h+='</div>';
+  }
+
+  // Section: Wasted
+  if(wasted.length){
+    h+='<div style="font-size:11px;font-weight:700;color:#7a5c3a;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px;">🗑 Wasted ('+wasted.length+')</div>';
+    h+='<div style="background:#fff8f0;border-radius:12px;border:1px solid #e0d0ba;padding:0 14px;margin-bottom:16px;">';
+    wasted.forEach(function(x,i){
+      var it=S.items.filter(function(z){return z.id===x.itemId;})[0];
+      var u=x.unit||(it?unitOf(it):'portions');
+      var unitSuffix=u==='portions'?' portion'+(x.portions>1?'s':''):u;
+      var time=new Date(x.date).toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'});
+      h+='<div style="display:flex;align-items:center;gap:12px;padding:10px 0;'+(i<wasted.length-1?'border-bottom:1px solid #e8ddd0;':'')+'">';
+      h+='<div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:700;">'+esc(x.itemName)+'</div>';
+      h+='<div style="font-size:12px;color:#b85c38;">'+x.portions+unitSuffix+' · '+time+'</div></div>';
+      h+='</div>';
+    });
+    h+='</div>';
+  }
+
+  // Section: Prepped
+  if(prepped.length){
+    h+='<div style="font-size:11px;font-weight:700;color:#7a5c3a;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px;">🥡 Prepped ('+prepped.length+')</div>';
+    h+='<div style="background:#fff8f0;border-radius:12px;border:1px solid #e0d0ba;padding:0 14px;margin-bottom:16px;">';
+    prepped.forEach(function(x,i){
+      var it=S.items.filter(function(z){return z.id===x.itemId;})[0];
+      var u=x.unit||(it?unitOf(it):'portions');
+      var unitSuffix=u==='portions'?' portion'+(x.portions>1?'s':''):u;
+      var time=new Date(x.date).toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'});
+      h+='<div style="display:flex;align-items:center;gap:12px;padding:10px 0;'+(i<prepped.length-1?'border-bottom:1px solid #e8ddd0;':'')+'">';
+      h+='<div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:700;">'+esc(x.itemName)+'</div>';
+      h+='<div style="font-size:12px;color:#7a9e7e;">'+x.portions+unitSuffix+' · '+time+'</div></div>';
+      h+='</div>';
+    });
+    h+='</div>';
+  }
+
   return h;
 }
 
@@ -635,6 +813,21 @@ function renderModal(){
     h+='<button onclick="removeItem(\''+it.id+'\');" style="background:#b85c38;color:#fff;border:none;border-radius:10px;padding:12px 16px;font-size:13px;font-weight:700;cursor:pointer;flex:1;">Remove</button>';
     h+='</div></div>';
 
+  } else if(m.type==='confirm-archive'){
+    var isArch=isArchived(it);
+    var title=isArch?'Unarchive item?':'Archive item?';
+    var body=isArch
+      ? '&quot;'+esc(it.name)+'&quot; will return to your active stock and appear in alerts again.'
+      : '&quot;'+esc(it.name)+'&quot; will be hidden from stock, alerts, and the log list. You can restore it from the archive any time.';
+    var confirmLabel=isArch?'Unarchive':'Archive';
+    h+='<div style="'+sheet+'">';
+    h+='<div style="font-size:18px;font-weight:700;margin-bottom:4px;">'+title+'</div>';
+    h+='<div style="color:#7a5c3a;font-size:13px;margin-bottom:20px;">'+body+'</div>';
+    h+='<div style="display:flex;gap:10px;">';
+    h+='<button onclick="S.modal=null;render();" style="'+cs.btnSecondary+'flex:1;">Cancel</button>';
+    h+='<button onclick="confirmArchive(\''+it.id+'\');" style="'+cs.btnPrimary+'flex:1;">'+confirmLabel+'</button>';
+    h+='</div></div>';
+
   } else if(m.type==='edit'){
     var f=S.editForm;
     var u=f.unit||unitOf(it);
@@ -663,7 +856,15 @@ function renderModal(){
     h+='<div style="display:flex;gap:10px;margin-top:20px;">';
     h+='<button onclick="S.modal=null;render();" style="'+cs.btnSecondary+'flex:1;">Cancel</button>';
     h+='<button onclick="collectAndSaveEdit();" style="'+cs.btnPrimary+'flex:1;">Save Changes</button>';
-    h+='</div></div>';
+    h+='</div>';
+    // Archive / Unarchive (infrequent action, tucked under save button)
+    var archLabel=isArchived(it)?'📤 Unarchive item':'📁 Archive item';
+    var archSub=isArchived(it)?'Restore to your active stock':'Hide from stock and alerts (can be restored later)';
+    h+='<button onclick="collectEditForm();openArchiveConfirm(\''+it.id+'\');" style="background:transparent;border:1px dashed #c8b89a;color:#7a5c3a;border-radius:10px;padding:12px;width:100%;font-size:13px;cursor:pointer;margin-top:16px;text-align:left;">';
+    h+='<div style="font-weight:700;margin-bottom:2px;">'+archLabel+'</div>';
+    h+='<div style="font-size:11px;color:#a08060;">'+archSub+'</div>';
+    h+='</button>';
+    h+='</div>';
   }
 
   h+='</div>';
