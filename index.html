@@ -485,12 +485,15 @@ function render(){
   }
 
   // Nav
-  header+='<div style="display:flex;gap:4px;padding:8px 0 10px;">';
-  var navItems=[['stock','📦'],['add','+ Prep'],['log','🍽 Log'],['today','📅 Today'],['history','📋'],['settings','⚙️']];
+  header+='<div style="display:flex;gap:4px;padding:8px 0 10px;align-items:stretch;">';
+  var navItems=[['stock','Stock'],['add','+ Prep'],['log','Log'],['today','Today'],['history','History']];
   navItems.forEach(function(v){
     var active=S.view===v[0];
-    header+='<button onclick="setView(\''+v[0]+'\')" style="flex:1;padding:7px 2px;border-radius:8px;border:none;font-size:11px;cursor:pointer;background:'+(active?'#c8a96e':'rgba(255,255,255,0.08)')+';color:'+(active?'#3d2b1a':'#d4c4a8')+';font-weight:'+(active?'700':'400')+';">'+v[1]+'</button>';
+    header+='<button onclick="setView(\''+v[0]+'\')" style="flex:1;padding:8px 4px;border-radius:8px;border:none;font-size:12px;cursor:pointer;background:'+(active?'#c8a96e':'rgba(255,255,255,0.08)')+';color:'+(active?'#3d2b1a':'#d4c4a8')+';font-weight:'+(active?'700':'400')+';">'+v[1]+'</button>';
   });
+  // Settings icon - separate, smaller, pushed to the side
+  var sActive=S.view==='settings';
+  header+='<button onclick="setView(\'settings\')" style="width:36px;padding:8px 0;border-radius:8px;border:none;font-size:14px;cursor:pointer;background:'+(sActive?'#c8a96e':'rgba(255,255,255,0.08)')+';margin-left:4px;flex-shrink:0;">⚙️</button>';
   header+='</div></div>';
 
   // ── Main content
