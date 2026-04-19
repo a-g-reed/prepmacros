@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="PrepMacros" />
   <meta name="theme-color" content="#3d2b1a" />
-  <title>PrepMacros Stock Tracker</title>
+  <title>PrepMacros</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { min-height: 100vh; background: #f5efe6; font-family: -apple-system, sans-serif; color: #3d2b1a; -webkit-font-smoothing: antialiased; }
@@ -363,13 +363,13 @@ function render(){
 
   // Title row
   header+='<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0 8px;">';
-  header+='<div><div style="font-size:20px;font-weight:700;color:#f0d9b5;">PrepMacros</div><div style="font-size:10px;color:#c8a96e;letter-spacing:1.5px;text-transform:uppercase;">Stock Tracker</div></div>';
+  header+='<div><div style="font-size:20px;font-weight:700;color:#f0d9b5;">PrepMacros</div></div>';
   header+='<div style="display:flex;gap:6px;align-items:center;">';
 
   // Targets-aware macro widget: 4 rings if targets set, otherwise fallback pill
   if(hasTargets()){
     var m=macros||{cal:0,protein:0,carbs:0,fat:0};
-    var ringColors={cal:'#c8a96e',protein:'#b85c38',carbs:'#d4a843',fat:'#7a9e7e'};
+    var ringColors={cal:'#c8a96e',protein:'#b85c38',carbs:'#7b8ed6',fat:'#7a9e7e'};
     var tgts=[
       ['cal',m.cal,S.settings.targetCal,ringColors.cal],
       ['protein',m.protein,S.settings.targetProtein,ringColors.protein],
@@ -396,14 +396,13 @@ function render(){
   // Today strip
   if(macros || hasTargets()){
     var sm=macros||{cal:0,protein:0,carbs:0,fat:0};
-    header+='<div style="background:rgba(200,169,110,0.15);border-top:1px solid rgba(200,169,110,0.2);padding:8px 0;display:flex;gap:16px;overflow-x:auto;">';
-    header+='<span style="font-size:11px;color:#c8b89a;align-self:center;text-transform:uppercase;letter-spacing:0.5px;border-right:1px solid rgba(200,169,110,0.3);padding-right:14px;white-space:nowrap;">Today</span>';
+    header+='<div style="background:rgba(200,169,110,0.15);border-top:1px solid rgba(200,169,110,0.2);padding:8px 16px;display:flex;gap:18px;overflow-x:auto;justify-content:space-around;">';
     var mm=hasTargets()
       ? [['Cal',sm.cal,S.settings.targetCal,''],['Protein',sm.protein,S.settings.targetProtein,'g'],['Carbs',sm.carbs,S.settings.targetCarbs,'g'],['Fat',sm.fat,S.settings.targetFat,'g']]
       : [['Protein',sm.protein,0,'g'],['Carbs',sm.carbs,0,'g'],['Fat',sm.fat,0,'g']];
     mm.forEach(function(m){
       var label=m[0],val=m[1],tgt=m[2],sfx=m[3];
-      var display=tgt>0?val+'/'+tgt+sfx:val+sfx;
+      var display=tgt>0?val+' / '+tgt+sfx:val+sfx;
       header+='<div style="text-align:center;flex-shrink:0;"><div style="font-size:15px;font-weight:700;color:#f0d9b5;">'+display+'</div><div style="font-size:9px;color:#c8b89a;text-transform:uppercase;">'+label+'</div></div>';
     });
     header+='</div>';
@@ -811,7 +810,7 @@ function renderToday(){
   var sm=macros||{cal:0,protein:0,carbs:0,fat:0};
   var showCard=macros||hasTargets();
   if(showCard){
-    var ringColors={cal:'#c8a96e',protein:'#b85c38',carbs:'#d4a843',fat:'#7a9e7e'};
+    var ringColors={cal:'#c8a96e',protein:'#b85c38',carbs:'#7b8ed6',fat:'#7a9e7e'};
     h+='<div style="background:#fff8f0;border:1px solid #e0d0ba;border-radius:14px;padding:16px;margin-bottom:20px;">';
 
     if(hasTargets()){
@@ -843,7 +842,7 @@ function renderToday(){
         h+='<div style="margin-bottom:'+(i<macroRows.length-1?'14px':'0')+';">';
         h+='<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;">';
         h+='<div style="font-size:13px;font-weight:700;color:#3d2b1a;">'+label+'</div>';
-        h+='<div style="font-size:13px;color:'+rightColor+';"><strong>'+val+sfx+'</strong> <span style="color:#a08060;">/ '+tgt+sfx+'</span></div>';
+        h+='<div style="font-size:13px;color:'+rightColor+';"><strong>'+val+sfx+'</strong> <span style="color:#a08060;"> / '+tgt+sfx+'</span></div>';
         h+='</div>';
         h+=progressBar(pct,col);
         h+='<div style="text-align:right;font-size:11px;color:'+rightColor+';margin-top:3px;">'+rightLabel+'</div>';
