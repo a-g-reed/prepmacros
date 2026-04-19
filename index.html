@@ -42,6 +42,7 @@ var S = {
   modal:null, logPortions:1, restockPortions:1, wastePortions:1, editForm:null,
   syncStatus:'syncing', syncMsg:'Loading\u2026',
   showArchived:false, stockFilter:'all', histEditAmount:0, reorderMode:false,
+  manualForm:null,
   form:{name:'',category:'Protein',unit:'portions',portions:'',expiryDays:'',cal:'',protein:'',carbs:'',fat:'',notes:''}
 };
 
@@ -109,11 +110,20 @@ function macroFor(it,n){
 
 function todayMacros(){
   var t=todayStr(); var cal=0,pro=0,carb=0,fat=0,any=false;
+  // Eat entries from stock items
   S.history.filter(function(h){return h.type==='eat'&&h.date&&h.date.indexOf(t)===0;}).forEach(function(h){
     var it=S.items.filter(function(x){return x.id===h.itemId;})[0];
     if(!it)return;
     var m=macroFor(it,h.portions);
     if(m){cal+=m.cal;pro+=m.protein;carb+=m.carbs;fat+=m.fat;any=true;}
+  });
+  // Manual entries
+  S.history.filter(function(h){return h.type==='manual'&&h.date&&h.date.indexOf(t)===0;}).forEach(function(h){
+    cal+=parseFloat(h.cal||0);
+    pro+=parseFloat(h.protein||0);
+    carb+=parseFloat(h.carbs||0);
+    fat+=parseFloat(h.fat||0);
+    any=true;
   });
   return any?{cal:Math.round(cal),protein:Math.round(pro),carbs:Math.round(carb),fat:Math.round(fat)}:null;
 }
@@ -218,10 +228,57 @@ function toggleArchive(id){
 // History entry editing (Today tab)
 function openHistoryEdit(hid){
   var entry=S.history.filter(function(x){return x.hid===hid;})[0]; if(!entry)return;
+  if(entry.type==='manual'){
+    // Manual entries get a different edit form
+    S.modal={type:'manual-entry',entry:entry,editingHid:hid};
+    S.manualForm={label:entry.label||'',cal:entry.cal||'',protein:entry.protein||'',carbs:entry.carbs||'',fat:entry.fat||''};
+    render();
+    return;
+  }
   S.modal={type:'edit-history',entry:entry};
   S.histEditAmount=entry.portions;
   render();
 }
+
+// Manual macro entry
+function openManualEntry(){
+  S.modal={type:'manual-entry',entry:null,editingHid:null};
+  S.manualForm={label:'',cal:'',protein:'',carbs:'',fat:''};
+  render();
+}
+
+function saveManualEntry(){
+  var f=S.manualForm||{};
+  var cal=parseFloat(f.cal)||0;
+  var protein=parseFloat(f.protein)||0;
+  var carbs=parseFloat(f.carbs)||0;
+  var fat=parseFloat(f.fat)||0;
+  // Require at least one non-zero macro
+  if(cal<=0 && protein<=0 && carbs<=0 && fat<=0){
+    alert('Please enter at least one macro value.');
+    return;
+  }
+  var label=(f.label||'').trim()||'Untitled';
+  var editingHid=S.modal&&S.modal.editingHid;
+  if(editingHid){
+    // Update existing entry, preserving date
+    S.history=S.history.map(function(x){
+      if(x.hid!==editingHid) return x;
+      var copy={}; for(var k in x) copy[k]=x[k];
+      copy.label=label; copy.cal=cal; copy.protein=protein; copy.carbs=carbs; copy.fat=fat; copy.edited=true;
+      return copy;
+    });
+  } else {
+    S.history.unshift({hid:newHid(),type:'manual',label:label,cal:cal,protein:protein,carbs:carbs,fat:fat,date:new Date().toISOString()});
+  }
+  save();S.modal=null;S.manualForm=null;render();
+}
+
+function deleteManualEntry(hid){
+  S.history=S.history.filter(function(x){return x.hid!==hid;});
+  save();S.modal=null;S.manualForm=null;render();
+}
+
 
 function saveHistoryEdit(hid){
   var entry=S.history.filter(function(x){return x.hid===hid;})[0]; if(!entry)return;
@@ -755,8 +812,11 @@ function renderLog(){
     var rb=b.totalPortions>0?b.portions/b.totalPortions:0;
     return rb-ra;
   });
-  var h='<div style="font-size:22px;font-weight:700;margin-bottom:6px;">Log a Meal</div>';
-  h+='<div style="color:#7a5c3a;font-size:13px;margin-bottom:16px;">Tap an item to deduct from stock</div>';
+  var h='<div style="font-size:22px;font-weight:700;margin-bottom:6px;">Food Log</div>';
+  h+='<div style="color:#7a5c3a;font-size:13px;margin-bottom:16px;">Tap an item to deduct from stock or log a manual entry</div>';
+
+  // Manual entry button (above category pills)
+  h+='<button onclick="openManualEntry()" style="background:transparent;border:1px dashed #c8b89a;color:#7a5c3a;border-radius:10px;padding:12px;width:100%;font-size:13px;cursor:pointer;margin-bottom:14px;">+ Add manual entry</button>';
 
   // Category filter pills
   if(avail.length){
@@ -885,18 +945,39 @@ function renderToday(){
   var ate=todays.filter(function(x){return x.type==='eat';});
   var wasted=todays.filter(function(x){return x.type==='waste';});
   var prepped=todays.filter(function(x){return x.type==='prep';});
+  var manualEntries=todays.filter(function(x){return x.type==='manual';});
 
   if(!todays.length){
     if(hasTargets()){
       // Gauges are shown above, just a small prompt
-      h+='<div style="text-align:center;padding:16px 20px;color:#a08060;font-size:13px;">No meals logged yet — head to Log to record one</div>';
+      h+='<div style="text-align:center;padding:16px 20px;color:#a08060;font-size:13px;">No meals logged yet — log a meal or add a manual entry</div>';
     } else {
       h+='<div style="text-align:center;padding:48px 20px;color:#a08060;">';
       h+='<div style="font-size:40px;margin-bottom:12px;">🌱</div>';
       h+='<div style="font-size:18px;font-weight:700;margin-bottom:6px;color:#7a5c3a;">Nothing logged yet</div>';
-      h+='<div style="font-size:13px;">Head to Log to record a meal</div></div>';
+      h+='<div style="font-size:13px;">Log a meal or add a manual entry</div></div>';
     }
     return h;
+  }
+
+  // Section: Manual entries
+  if(manualEntries.length){
+    h+='<div style="font-size:11px;font-weight:700;color:#7a5c3a;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px;">✏️ Manual ('+manualEntries.length+')</div>';
+    h+='<div style="background:#fff8f0;border-radius:12px;border:1px solid #e0d0ba;padding:0 14px;margin-bottom:16px;">';
+    manualEntries.forEach(function(x,i){
+      var time=new Date(x.date).toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'});
+      var parts=[];
+      if(x.cal) parts.push(Math.round(x.cal)+' cal');
+      if(x.protein) parts.push(Math.round(x.protein)+'g pro');
+      if(x.carbs) parts.push(Math.round(x.carbs)+'g carbs');
+      if(x.fat) parts.push(Math.round(x.fat)+'g fat');
+      h+='<div onclick="openHistoryEdit(\''+x.hid+'\')" style="display:flex;align-items:center;gap:12px;padding:10px 0;cursor:pointer;'+(i<manualEntries.length-1?'border-bottom:1px solid #e8ddd0;':'')+'">';
+      h+='<div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:700;">'+esc(x.label||'Untitled')+(x.edited?' <span style="font-size:10px;color:#a08060;font-weight:400;">(edited)</span>':'')+'</div>';
+      h+='<div style="font-size:12px;color:#7a5c3a;">'+parts.join(' · ')+' · '+time+'</div></div>';
+      h+='<div style="font-size:13px;color:#a08060;">›</div>';
+      h+='</div>';
+    });
+    h+='</div>';
   }
 
   // Section: Meals eaten
@@ -1162,6 +1243,29 @@ function renderModal(){
     h+='<button onclick="saveHistoryEdit(\''+entry.hid+'\');" style="'+cs.btnPrimary+'flex:1;">Save</button>';
     h+='</div>';
     h+='<button onclick="deleteHistoryEntry(\''+entry.hid+'\');" style="background:transparent;border:1px dashed #b85c38;color:#b85c38;border-radius:10px;padding:10px;width:100%;font-size:13px;cursor:pointer;margin-top:12px;">Delete entry &amp; restore stock</button>';
+    h+='</div>';
+
+  } else if(m.type==='manual-entry'){
+    var mf=S.manualForm||{label:'',cal:'',protein:'',carbs:'',fat:''};
+    var isEdit=!!m.editingHid;
+    h+='<div style="'+sheet+'max-height:85vh;overflow-y:auto;">';
+    h+='<div style="font-size:18px;font-weight:700;margin-bottom:4px;">✏️ '+(isEdit?'Edit manual entry':'Add manual entry')+'</div>';
+    h+='<div style="color:#7a5c3a;font-size:13px;margin-bottom:16px;">For meals not tracked in your prep stock — breakfast, sides, drinks, etc.</div>';
+    h+='<label style="'+cs.label+'">Label</label>';
+    h+='<input id="mf-label" style="'+cs.input+'" value="'+esc(mf.label)+'" placeholder="e.g. Breakfast, Protein shake" oninput="S.manualForm.label=this.value" />';
+    h+='<div style="font-size:14px;font-weight:700;margin:16px 0 2px;color:#5a3e2a;">Macros <span style="font-size:12px;color:#a08060;font-weight:400;">(at least one required)</span></div>';
+    h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">';
+    [['mf-cal','Calories','cal',mf.cal],['mf-protein','Protein (g)','protein',mf.protein],['mf-carbs','Carbs (g)','carbs',mf.carbs],['mf-fat','Fat (g)','fat',mf.fat]].forEach(function(x){
+      h+='<div><label style="'+cs.label+'">'+x[1]+'</label><input id="'+x[0]+'" type="number" inputmode="decimal" style="'+cs.input+'" value="'+esc(x[3])+'" placeholder="0" min="0" oninput="S.manualForm.'+x[2]+'=this.value" /></div>';
+    });
+    h+='</div>';
+    h+='<div style="display:flex;gap:10px;margin-top:20px;">';
+    h+='<button onclick="S.modal=null;S.manualForm=null;render();" style="'+cs.btnSecondary+'flex:1;">Cancel</button>';
+    h+='<button onclick="saveManualEntry();" style="'+cs.btnPrimary+'flex:1;">'+(isEdit?'Save Changes':'Add Entry')+'</button>';
+    h+='</div>';
+    if(isEdit){
+      h+='<button onclick="deleteManualEntry(\''+m.editingHid+'\');" style="background:transparent;border:1px dashed #b85c38;color:#b85c38;border-radius:10px;padding:10px;width:100%;font-size:13px;cursor:pointer;margin-top:12px;">Delete entry</button>';
+    }
     h+='</div>';
 
   } else if(m.type==='edit'){
