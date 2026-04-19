@@ -369,7 +369,7 @@ function render(){
   // Targets-aware macro widget: 4 rings if targets set, otherwise fallback pill
   if(hasTargets()){
     var m=macros||{cal:0,protein:0,carbs:0,fat:0};
-    var ringColors={cal:'#c8a96e',protein:'#b85c38',carbs:'#7b8ed6',fat:'#7a9e7e'};
+    var ringColors={cal:'#7b8ed6',protein:'#b85c38',carbs:'#c8a96e',fat:'#7a9e7e'};
     var tgts=[
       ['cal',m.cal,S.settings.targetCal,ringColors.cal],
       ['protein',m.protein,S.settings.targetProtein,ringColors.protein],
@@ -396,14 +396,20 @@ function render(){
   // Today strip
   if(macros || hasTargets()){
     var sm=macros||{cal:0,protein:0,carbs:0,fat:0};
-    header+='<div style="background:rgba(200,169,110,0.15);border-top:1px solid rgba(200,169,110,0.2);padding:8px 16px;display:flex;gap:18px;overflow-x:auto;justify-content:space-around;">';
+    header+='<div style="background:rgba(200,169,110,0.12);border-top:1px solid rgba(200,169,110,0.18);padding:10px 16px;display:flex;gap:16px;overflow-x:auto;justify-content:space-around;">';
     var mm=hasTargets()
       ? [['Cal',sm.cal,S.settings.targetCal,''],['Protein',sm.protein,S.settings.targetProtein,'g'],['Carbs',sm.carbs,S.settings.targetCarbs,'g'],['Fat',sm.fat,S.settings.targetFat,'g']]
       : [['Protein',sm.protein,0,'g'],['Carbs',sm.carbs,0,'g'],['Fat',sm.fat,0,'g']];
     mm.forEach(function(m){
       var label=m[0],val=m[1],tgt=m[2],sfx=m[3];
-      var display=tgt>0?val+' / '+tgt+sfx:val+sfx;
-      header+='<div style="text-align:center;flex-shrink:0;"><div style="font-size:15px;font-weight:700;color:#f0d9b5;">'+display+'</div><div style="font-size:9px;color:#c8b89a;text-transform:uppercase;">'+label+'</div></div>';
+      header+='<div style="text-align:center;flex-shrink:0;min-width:0;">';
+      if(tgt>0){
+        header+='<div style="font-size:13px;color:#f0d9b5;line-height:1.2;"><span style="font-weight:600;">'+val+sfx+'</span><span style="color:#a8998a;font-weight:400;"> / '+tgt+sfx+'</span></div>';
+      } else {
+        header+='<div style="font-size:13px;color:#f0d9b5;font-weight:600;line-height:1.2;">'+val+sfx+'</div>';
+      }
+      header+='<div style="font-size:9px;color:#a8998a;text-transform:uppercase;letter-spacing:0.5px;margin-top:2px;">'+label+'</div>';
+      header+='</div>';
     });
     header+='</div>';
   }
@@ -810,7 +816,7 @@ function renderToday(){
   var sm=macros||{cal:0,protein:0,carbs:0,fat:0};
   var showCard=macros||hasTargets();
   if(showCard){
-    var ringColors={cal:'#c8a96e',protein:'#b85c38',carbs:'#7b8ed6',fat:'#7a9e7e'};
+    var ringColors={cal:'#7b8ed6',protein:'#b85c38',carbs:'#c8a96e',fat:'#7a9e7e'};
     h+='<div style="background:#fff8f0;border:1px solid #e0d0ba;border-radius:14px;padding:16px;margin-bottom:20px;">';
 
     if(hasTargets()){
