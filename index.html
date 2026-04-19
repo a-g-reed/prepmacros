@@ -486,7 +486,7 @@ function render(){
 
   // Nav
   header+='<div style="display:flex;gap:4px;padding:8px 0 10px;">';
-  var navItems=[['stock','📦'],['add','+ Add'],['log','🍽 Log'],['today','📅 Today'],['history','📋'],['settings','⚙️']];
+  var navItems=[['stock','📦'],['add','+ Prep'],['log','🍽 Log'],['today','📅 Today'],['history','📋'],['settings','⚙️']];
   navItems.forEach(function(v){
     var active=S.view===v[0];
     header+='<button onclick="setView(\''+v[0]+'\')" style="flex:1;padding:7px 2px;border-radius:8px;border:none;font-size:11px;cursor:pointer;background:'+(active?'#c8a96e':'rgba(255,255,255,0.08)')+';color:'+(active?'#3d2b1a':'#d4c4a8')+';font-weight:'+(active?'700':'400')+';">'+v[1]+'</button>';
@@ -752,7 +752,7 @@ function renderAdd(){
   var u=f.unit||'portions';
   var amountLabel=u==='portions'?'Portions prepped':'Amount prepped ('+u+')';
   var macroLabel=u==='portions'?'Macros per portion':'Macros per 100'+u;
-  var h='<div style="font-size:22px;font-weight:700;margin-bottom:18px;">Log a Prep Session</div>';
+  var h='<div style="font-size:22px;font-weight:700;margin-bottom:18px;">Prep Session Builder</div>';
   h+='<label style="'+cs.label+'">Item name</label>';
   h+='<input id="f-name" style="'+cs.input+'" value="'+esc(f.name)+'" placeholder="e.g. Shawarma Chicken" />';
   h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">';
@@ -1070,9 +1070,17 @@ function renderHistory(){
   days.forEach(function(day){
     var label=day===today?'Today':daysAgo(day+'T12:00:00')||day;
     var dc=0,dp=0,dany=false;
-    grouped[day].filter(function(x){return x.type==='eat';}).forEach(function(x){
-      var it=S.items.filter(function(z){return z.id===x.itemId;})[0];
-      if(it&&it.macros&&it.macros.cal){dc+=parseFloat(it.macros.cal)*x.portions;dp+=parseFloat(it.macros.protein||0)*x.portions;dany=true;}
+    grouped[day].forEach(function(x){
+      if(x.type==='eat'){
+        var it=S.items.filter(function(z){return z.id===x.itemId;})[0];
+        if(!it) return;
+        var mm=macroFor(it,x.portions);
+        if(mm){dc+=mm.cal;dp+=mm.protein;dany=true;}
+      } else if(x.type==='manual'){
+        dc+=parseFloat(x.cal||0);
+        dp+=parseFloat(x.protein||0);
+        dany=true;
+      }
     });
     h+='<div style="display:flex;justify-content:space-between;align-items:baseline;margin:16px 0 4px;">';
     h+='<div style="font-size:11px;font-weight:700;color:#7a5c3a;text-transform:uppercase;letter-spacing:0.8px;">'+label+'</div>';
@@ -1080,14 +1088,26 @@ function renderHistory(){
     h+='</div>';
     h+='<div style="background:#fff8f0;border-radius:12px;border:1px solid #e0d0ba;padding:0 14px;margin-bottom:12px;">';
     grouped[day].forEach(function(x){
-      var icon=x.type==='eat'?'🍽':x.type==='waste'?'🗑':x.type==='deleted'?'❌':'🥡';
-      var it=S.items.filter(function(z){return z.id===x.itemId;})[0];
-      var u=x.unit||(it?unitOf(it):'portions');
-      var unitSuffix=u==='portions'?' portion'+(x.portions>1?'s':''):u;
-      var meta=x.type==='eat'?'Ate '+x.portions+unitSuffix:x.type==='waste'?'Wasted '+x.portions+unitSuffix:x.type==='deleted'?'Removed from stock':'Prepped '+x.portions+unitSuffix;
+      var icon=x.type==='eat'?'🍽':x.type==='waste'?'🗑':x.type==='deleted'?'❌':x.type==='manual'?'✏️':'🥡';
+      var name, meta;
+      if(x.type==='manual'){
+        name=x.label||'Untitled';
+        var parts=[];
+        if(x.cal) parts.push(Math.round(x.cal)+' cal');
+        if(x.protein) parts.push(Math.round(x.protein)+'g pro');
+        if(x.carbs) parts.push(Math.round(x.carbs)+'g carbs');
+        if(x.fat) parts.push(Math.round(x.fat)+'g fat');
+        meta='Manual entry'+(parts.length?' · '+parts.join(' · '):'');
+      } else {
+        var it=S.items.filter(function(z){return z.id===x.itemId;})[0];
+        var u=x.unit||(it?unitOf(it):'portions');
+        var unitSuffix=u==='portions'?' portion'+(x.portions>1?'s':''):u;
+        name=x.itemName;
+        meta=x.type==='eat'?'Ate '+x.portions+unitSuffix:x.type==='waste'?'Wasted '+x.portions+unitSuffix:x.type==='deleted'?'Removed from stock':'Prepped '+x.portions+unitSuffix;
+      }
       h+='<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid #e8ddd0;">';
       h+='<div style="font-size:18px;width:26px;text-align:center;flex-shrink:0;">'+icon+'</div>';
-      h+='<div style="flex:1;"><div style="font-size:14px;font-weight:700;">'+esc(x.itemName)+'</div>';
+      h+='<div style="flex:1;"><div style="font-size:14px;font-weight:700;">'+esc(name)+'</div>';
       h+='<div style="font-size:12px;color:#7a5c3a;">'+meta+'</div></div></div>';
     });
     h+='</div>';
