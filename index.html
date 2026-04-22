@@ -32,12 +32,20 @@
 var SB_URL = 'https://zbeuowizrnkotijtzoeh.supabase.co';
 var SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpiZXVvd2l6cm5rb3RpanR6b2VoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyODM4MDIsImV4cCI6MjA5MTg1OTgwMn0.c8_qca_JiWE0GAnuHW5RMtGgER7ywGO6rHifcCg1frI';
 var LOCAL_KEY = 'prepmacros-v2';
-var CATS = ['All','Protein','Carbs','Veg','Snack','Dessert','Creami Base','Other'];
-var DEFAULTS = { lowStockThreshold:3, expiryDays:5, forgottenDays:14, targetCal:0, targetProtein:0, targetCarbs:0, targetFat:0 };
+var DEFAULT_CATS = ['Protein','Carbs','Veg','Snack','Dessert','Creami Base','Other'];
+// Helper that returns the user's category list (with 'All' prepended for filtering).
+// Backed by S.settings.categories, fallbacks to DEFAULT_CATS if not configured yet.
+function getCats(){
+  var userCats=(S.settings && S.settings.categories && S.settings.categories.length) ? S.settings.categories : DEFAULT_CATS;
+  return ['All'].concat(userCats);
+}
+// Legacy var kept for compatibility with inline references that still read CATS
+Object.defineProperty(window,'CATS',{get:function(){return getCats();}});
+var DEFAULTS = { lowStockThreshold:3, expiryDays:5, forgottenDays:14, targetCal:0, targetProtein:0, targetCarbs:0, targetFat:0, categories:['Protein','Carbs','Veg','Snack','Dessert','Creami Base','Other'] };
 
 // ── State ────────────────────────────────────────────────────────────────────
 var S = {
-  items:[], history:[], settings:{lowStockThreshold:3,expiryDays:5,forgottenDays:14,targetCal:0,targetProtein:0,targetCarbs:0,targetFat:0},
+  items:[], history:[], settings:{lowStockThreshold:3,expiryDays:5,forgottenDays:14,targetCal:0,targetProtein:0,targetCarbs:0,targetFat:0,categories:['Protein','Carbs','Veg','Snack','Dessert','Creami Base','Other']},
   dismissedAlerts:{}, view:'stock', filterCat:'All', expandedId:null,
   modal:null, logPortions:1, restockPortions:1, wastePortions:1, editForm:null,
   syncStatus:'syncing', syncMsg:'Loading\u2026',
@@ -188,7 +196,15 @@ function addItem(){
     macros:{cal:f.cal,protein:f.protein,carbs:f.carbs,fat:f.fat},notes:f.notes,prepDate:new Date().toISOString(),lastEaten:null};
   S.items.push(item);
   S.history.unshift({hid:newHid(),type:'prep',itemId:item.id,itemName:item.name,portions:item.portions,unit:unit,date:new Date().toISOString()});
-  save(); S.form={name:'',category:'Protein',unit:'portions',portions:'',expiryDays:'',cal:'',protein:'',carbs:'',fat:'',notes:''}; S.view='stock'; render();
+  save();
+  S.form={name:'',category:'Protein',unit:'portions',portions:'',expiryDays:'',cal:'',protein:'',carbs:'',fat:'',notes:''};
+  S.view='stock';
+  // Offer to log as eaten today (only if this item has macros — otherwise there's no point)
+  if(item.macros && item.macros.cal){
+    S.modal={type:'log-after-prep',item:item};
+    S.logPortions=unitStep(unit);
+  }
+  render();
 }
 
 function restockItem(){
@@ -198,7 +214,16 @@ function restockItem(){
   S.items=S.items.map(function(it){return it.id===id?{id:it.id,name:it.name,category:it.category,unit:it.unit,portions:it.portions+n,totalPortions:it.totalPortions+n,expiryDays:it.expiryDays,macros:it.macros,notes:it.notes,prepDate:new Date().toISOString(),lastEaten:it.lastEaten,archived:false}:it;});
   S.history.unshift({hid:newHid(),type:'prep',itemId:id,itemName:S.modal.item.name,portions:n,unit:u,date:new Date().toISOString()});
   ['exp','expw','fgt'].forEach(function(p){delete S.dismissedAlerts[p+'-'+id];});
-  save(); S.modal=null; S.restockPortions=1; render();
+  save();
+  var restockedItem=S.items.filter(function(x){return x.id===id;})[0];
+  S.modal=null;
+  S.restockPortions=1;
+  // Offer to log as eaten today (only if this item has macros)
+  if(restockedItem && restockedItem.macros && restockedItem.macros.cal){
+    S.modal={type:'log-after-prep',item:restockedItem};
+    S.logPortions=unitStep(u);
+  }
+  render();
 }
 
 function logMeal(){
@@ -207,6 +232,24 @@ function logMeal(){
   var u=unitOf(S.modal.item);
   S.items=S.items.map(function(it){return it.id===id?{id:it.id,name:it.name,category:it.category,unit:it.unit,portions:Math.max(0,it.portions-n),totalPortions:it.totalPortions,expiryDays:it.expiryDays,macros:it.macros,notes:it.notes,prepDate:it.prepDate,lastEaten:new Date().toISOString(),archived:it.archived}:it;});
   S.history.unshift({hid:newHid(),type:'eat',itemId:id,itemName:S.modal.item.name,portions:n,unit:u,date:new Date().toISOString()});
+  delete S.dismissedAlerts['fgt-'+id];
+  save(); S.modal=null; S.logPortions=1; render();
+}
+
+function logMealAfterPrep(){
+  if(!S.modal || S.modal.type!=='log-after-prep')return;
+  // Re-resolve the item from state (in case restock/add just modified it)
+  var id=S.modal.item.id;
+  var it=S.items.filter(function(x){return x.id===id;})[0];
+  if(!it){ S.modal=null; S.logPortions=1; render(); return; }
+  var n=Math.min(S.logPortions,it.portions);
+  if(n<=0){ S.modal=null; S.logPortions=1; render(); return; }
+  var u=unitOf(it);
+  S.items=S.items.map(function(x){
+    if(x.id!==id)return x;
+    return {id:x.id,name:x.name,category:x.category,unit:x.unit,portions:Math.max(0,x.portions-n),totalPortions:x.totalPortions,expiryDays:x.expiryDays,macros:x.macros,notes:x.notes,prepDate:x.prepDate,lastEaten:new Date().toISOString(),archived:x.archived};
+  });
+  S.history.unshift({hid:newHid(),type:'eat',itemId:id,itemName:it.name,portions:n,unit:u,date:new Date().toISOString()});
   delete S.dismissedAlerts['fgt-'+id];
   save(); S.modal=null; S.logPortions=1; render();
 }
@@ -327,6 +370,71 @@ function deleteHistoryEntry(hid){
 function openArchiveConfirm(id){
   var it=S.items.filter(function(x){return x.id===id;})[0]; if(!it)return;
   S.modal={type:'confirm-archive',item:it};
+  render();
+}
+
+// Category management
+function renameCategory(oldName, newName){
+  newName=(newName||'').trim();
+  if(!newName || newName===oldName) return;
+  // Guard against duplicates
+  if(S.settings.categories.indexOf(newName)!==-1){ alert('A category named "'+newName+'" already exists.'); return; }
+  // Guard against renaming to "All" (reserved)
+  if(newName==='All'){ alert('"All" is a reserved name.'); return; }
+  // Update the settings list
+  S.settings.categories=S.settings.categories.map(function(c){return c===oldName?newName:c;});
+  // Update all items that reference the old name
+  S.items=S.items.map(function(it){
+    if(it.category!==oldName) return it;
+    var copy={}; for(var k in it) copy[k]=it[k];
+    copy.category=newName;
+    return copy;
+  });
+  // Fix filterCat if it was pointing at the renamed one
+  if(S.filterCat===oldName) S.filterCat=newName;
+  // Fix form/editForm in-progress state
+  if(S.form && S.form.category===oldName) S.form.category=newName;
+  if(S.editForm && S.editForm.category===oldName) S.editForm.category=newName;
+  save(); render();
+}
+
+function moveCategory(cat, direction){
+  var arr=S.settings.categories.slice();
+  var idx=arr.indexOf(cat);
+  if(idx<0) return;
+  var newIdx=idx+direction;
+  if(newIdx<0 || newIdx>=arr.length) return;
+  var tmp=arr[idx]; arr[idx]=arr[newIdx]; arr[newIdx]=tmp;
+  S.settings.categories=arr;
+  save(); render();
+}
+
+function promptRenameCategory(cat){
+  var next=prompt('Rename category "'+cat+'" to:', cat);
+  if(next!=null) renameCategory(cat, next);
+}
+
+function duplicateItem(id){
+  // Pulls the latest form values from the Edit modal first, so any in-progress edits are captured on the source
+  if(S.editForm && S.editForm.id===id) collectEditForm();
+  var src=S.items.filter(function(x){return x.id===id;})[0];
+  if(!src)return;
+  // Pre-fill the Prep Session Builder form with the source item's details
+  S.form={
+    name:(src.name||'Item')+' (copy)',
+    category:src.category||'Protein',
+    unit:src.unit||'portions',
+    portions:'',
+    expiryDays:src.expiryDays!=null?String(src.expiryDays):'',
+    cal:(src.macros&&src.macros.cal)||'',
+    protein:(src.macros&&src.macros.protein)||'',
+    carbs:(src.macros&&src.macros.carbs)||'',
+    fat:(src.macros&&src.macros.fat)||'',
+    notes:src.notes||''
+  };
+  S.modal=null;
+  S.editForm=null;
+  S.view='add';
   render();
 }
 
@@ -757,29 +865,30 @@ function renderAdd(){
   var macroLabel=u==='portions'?'Macros per portion':'Macros per 100'+u;
   var h='<div style="font-size:22px;font-weight:700;margin-bottom:18px;">Prep Session Builder</div>';
   h+='<label style="'+cs.label+'">Item name</label>';
-  h+='<input id="f-name" style="'+cs.input+'" value="'+esc(f.name)+'" placeholder="e.g. Shawarma Chicken" />';
+  h+='<input id="f-name" tabindex="1" style="'+cs.input+'" value="'+esc(f.name)+'" placeholder="e.g. Shawarma Chicken" />';
   h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">';
-  h+='<div><label style="'+cs.label+'">Category</label><select id="f-cat" style="'+cs.input+'">';
+  h+='<div><label style="'+cs.label+'">Category</label><select id="f-cat" tabindex="2" style="'+cs.input+'">';
   CATS.filter(function(c){return c!=='All';}).forEach(function(c){h+='<option'+(f.category===c?' selected':'')+'>'+c+'</option>';});
   h+='</select></div>';
-  h+='<div><label style="'+cs.label+'">Measured in</label><select id="f-unit" onchange="S.form.unit=this.value;collectAddForm();render();" style="'+cs.input+'">';
+  h+='<div><label style="'+cs.label+'">Measured in</label><select id="f-unit" tabindex="3" onchange="S.form.unit=this.value;collectAddForm();render();" style="'+cs.input+'">';
   [['portions','Portions'],['g','Grams (g)'],['ml','Millilitres (ml)']].forEach(function(opt){
     h+='<option value="'+opt[0]+'"'+(u===opt[0]?' selected':'')+'>'+opt[1]+'</option>';
   });
   h+='</select></div>';
   h+='</div>';
   h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">';
-  h+='<div><label style="'+cs.label+'">'+amountLabel+'</label><input id="f-portions" type="number" inputmode="decimal" style="'+cs.input+'" value="'+esc(f.portions)+'" placeholder="'+(u==='portions'?'e.g. 12':'e.g. 500')+'" min="1" /></div>';
-  h+='<div><label style="'+cs.label+'">Expires after (days)</label><input id="f-expiry" type="number" inputmode="decimal" style="'+cs.input+'" value="'+esc(f.expiryDays)+'" placeholder="default: '+S.settings.expiryDays+'" min="1" /></div>';
+  h+='<div><label style="'+cs.label+'">'+amountLabel+'</label><input id="f-portions" tabindex="4" type="number" inputmode="decimal" style="'+cs.input+'" value="'+esc(f.portions)+'" placeholder="'+(u==='portions'?'e.g. 12':'e.g. 500')+'" min="1" /></div>';
+  h+='<div><label style="'+cs.label+'">Expires after (days)</label><input id="f-expiry" tabindex="5" type="number" inputmode="decimal" style="'+cs.input+'" value="'+esc(f.expiryDays)+'" placeholder="default: '+S.settings.expiryDays+'" min="1" /></div>';
   h+='</div>';
   h+='<div style="font-size:15px;font-weight:700;margin:18px 0 2px;color:#5a3e2a;">'+macroLabel+' <span style="font-size:12px;color:#a08060;font-weight:400;">(optional)</span></div>';
   h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">';
-  [['f-cal','Calories',f.cal],['f-protein','Protein (g)',f.protein],['f-carbs','Carbs (g)',f.carbs],['f-fat','Fat (g)',f.fat]].forEach(function(m){
-    h+='<div><label style="'+cs.label+'">'+m[1]+'</label><input id="'+m[0]+'" type="number" inputmode="decimal" style="'+cs.input+'" value="'+esc(m[2])+'" placeholder="0" min="0" /></div>';
+  var macroFields=[['f-cal','Calories',f.cal,6],['f-protein','Protein (g)',f.protein,7],['f-carbs','Carbs (g)',f.carbs,8],['f-fat','Fat (g)',f.fat,9]];
+  macroFields.forEach(function(m){
+    h+='<div><label style="'+cs.label+'">'+m[1]+'</label><input id="'+m[0]+'" tabindex="'+m[3]+'" type="number" inputmode="decimal" style="'+cs.input+'" value="'+esc(m[2])+'" placeholder="0" min="0" /></div>';
   });
   h+='</div>';
   h+='<label style="'+cs.label+'">Notes</label>';
-  h+='<input id="f-notes" style="'+cs.input+'" value="'+esc(f.notes)+'" placeholder="e.g. made with thighs, extra spicy" />';
+  h+='<input id="f-notes" tabindex="10" style="'+cs.input+'" value="'+esc(f.notes)+'" placeholder="e.g. made with thighs, extra spicy" />';
   h+='<button onclick="collectAndAdd()" style="'+cs.btnPrimary+'width:100%;margin-top:24px;padding:14px;">Add to Stock</button>';
   return h;
 }
@@ -1147,6 +1256,21 @@ function renderSettings(){
 
   h+='<button onclick="saveSettings()" style="'+cs.btnPrimary+'width:100%;padding:14px;margin-bottom:28px;">Save Settings</button>';
 
+  // Categories management
+  h+='<div style="margin-bottom:24px;">';
+  h+='<div style="font-size:17px;font-weight:700;margin-bottom:2px;">Categories</div>';
+  h+='<div style="font-size:12px;color:#a08060;margin-bottom:12px;">Rename or reorder your categories. Changes apply to all items using them.</div>';
+  var cats=S.settings.categories||DEFAULT_CATS;
+  cats.forEach(function(c,idx){
+    h+='<div style="display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid #e8ddd0;">';
+    h+='<div style="flex:1;min-width:0;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(c)+'</div>';
+    h+='<button onclick="promptRenameCategory(\''+esc(c).replace(/\x27/g,'\\\x27')+'\')" style="background:transparent;border:1px solid #c8b89a;color:#7a5c3a;border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer;">Rename</button>';
+    h+='<button onclick="moveCategory(\''+esc(c).replace(/\x27/g,'\\\x27')+'\',-1)" '+(idx===0?'disabled':'')+' style="width:32px;height:32px;border-radius:8px;border:1px solid #c8b89a;background:transparent;font-size:14px;cursor:pointer;opacity:'+(idx===0?0.3:1)+';">▲</button>';
+    h+='<button onclick="moveCategory(\''+esc(c).replace(/\x27/g,'\\\x27')+'\',1)" '+(idx===cats.length-1?'disabled':'')+' style="width:32px;height:32px;border-radius:8px;border:1px solid #c8b89a;background:transparent;font-size:14px;cursor:pointer;opacity:'+(idx===cats.length-1?0.3:1)+';">▼</button>';
+    h+='</div>';
+  });
+  h+='</div>';
+
   h+='<div style="margin-bottom:24px;">';
   h+='<div style="font-size:17px;font-weight:700;margin-bottom:2px;">Data Backup</div>';
   h+='<div style="font-size:12px;color:#a08060;margin-bottom:12px;">Export your stock and history as JSON</div>';
@@ -1229,6 +1353,19 @@ function renderModal(){
     h+='<div style="display:flex;gap:10px;">';
     h+='<button onclick="S.modal=null;render();" style="'+cs.btnSecondary+'flex:1;">Cancel</button>';
     h+='<button onclick="removeItem(\''+it.id+'\');" style="background:#b85c38;color:#fff;border:none;border-radius:10px;padding:12px 16px;font-size:13px;font-weight:700;cursor:pointer;flex:1;">Remove</button>';
+    h+='</div></div>';
+
+  } else if(m.type==='log-after-prep'){
+    var lpn=S.logPortions;
+    var lpu=unitOf(it);
+    h+='<div style="'+sheet+'">';
+    h+='<div style="font-size:18px;font-weight:700;margin-bottom:4px;">Log some as eaten?</div>';
+    h+='<div style="color:#7a5c3a;font-size:13px;margin-bottom:16px;">Sampled some of &quot;'+esc(it.name)+'&quot; while prepping? Log it today.</div>';
+    h+=stepperHTML('logPortions',lpn,unitStep(lpu),it.portions,lpu,it);
+    h+='<div id="macro-preview" style="margin-top:14px;">'+macroPreviewHTML(it,lpn)+'</div>';
+    h+='<div style="display:flex;gap:10px;margin-top:16px;">';
+    h+='<button onclick="S.modal=null;S.logPortions=1;render();" style="'+cs.btnSecondary+'flex:1;">Skip</button>';
+    h+='<button onclick="logMealAfterPrep();" style="'+cs.btnPrimary+'flex:1;">Log It</button>';
     h+='</div></div>';
 
   } else if(m.type==='confirm-archive'){
@@ -1320,10 +1457,15 @@ function renderModal(){
     h+='<button onclick="S.modal=null;render();" style="'+cs.btnSecondary+'flex:1;">Cancel</button>';
     h+='<button onclick="collectAndSaveEdit();" style="'+cs.btnPrimary+'flex:1;">Save Changes</button>';
     h+='</div>';
+    // Duplicate (handy for Creami bases and similar recipes with near-identical macros)
+    h+='<button onclick="duplicateItem(\''+it.id+'\');" style="background:transparent;border:1px dashed #c8b89a;color:#7a5c3a;border-radius:10px;padding:12px;width:100%;font-size:13px;cursor:pointer;margin-top:16px;text-align:left;">';
+    h+='<div style="font-weight:700;margin-bottom:2px;">📋 Duplicate item</div>';
+    h+='<div style="font-size:11px;color:#a08060;">Opens a prep session pre-filled with this item\'s details</div>';
+    h+='</button>';
     // Archive / Unarchive (infrequent action, tucked under save button)
     var archLabel=isArchived(it)?'📤 Unarchive item':'📁 Archive item';
     var archSub=isArchived(it)?'Restore to your active stock':'Hide from stock and alerts (can be restored later)';
-    h+='<button onclick="collectEditForm();openArchiveConfirm(\''+it.id+'\');" style="background:transparent;border:1px dashed #c8b89a;color:#7a5c3a;border-radius:10px;padding:12px;width:100%;font-size:13px;cursor:pointer;margin-top:16px;text-align:left;">';
+    h+='<button onclick="collectEditForm();openArchiveConfirm(\''+it.id+'\');" style="background:transparent;border:1px dashed #c8b89a;color:#7a5c3a;border-radius:10px;padding:12px;width:100%;font-size:13px;cursor:pointer;margin-top:10px;text-align:left;">';
     h+='<div style="font-weight:700;margin-bottom:2px;">'+archLabel+'</div>';
     h+='<div style="font-size:11px;color:#a08060;">'+archSub+'</div>';
     h+='</button>';
@@ -1346,7 +1488,7 @@ function stepperHTML(field,val,step,max,unit,item){
   return '<div style="display:flex;align-items:center;gap:16px;justify-content:center;">'+
     '<button onclick="stepperNudge(\''+field+'\','+(-step)+','+step+','+max+itemRef+')" style="width:44px;height:44px;border-radius:10px;border:1px solid #c8b89a;background:transparent;font-size:22px;cursor:pointer;flex-shrink:0;">&minus;</button>'+
     '<div style="display:flex;align-items:baseline;">'+
-      '<input type="number" inputmode="decimal" value="'+val+'" min="1" max="'+max+'" oninput="onStepperInput(\''+field+'\',this.value,'+max+itemRef+')" style="font-size:28px;font-weight:700;width:80px;text-align:center;border:none;background:transparent;color:#3d2b1a;-webkit-appearance:none;outline:none;padding:0;font-family:inherit;" />'+
+      '<input type="number" inputmode="decimal" value="'+val+'" min="1" max="'+max+'" onfocus="this.select()" oninput="onStepperInput(\''+field+'\',this.value,'+max+itemRef+')" style="font-size:28px;font-weight:700;width:80px;text-align:center;border:none;background:transparent;color:#3d2b1a;-webkit-appearance:none;outline:none;padding:0;font-family:inherit;" />'+
       (suffix?'<span style="font-size:18px;font-weight:700;color:#7a5c3a;margin-left:2px;">'+suffix+'</span>':'')+
     '</div>'+
     '<button onclick="stepperNudge(\''+field+'\','+step+','+step+','+max+itemRef+')" style="width:44px;height:44px;border-radius:10px;border:1px solid #c8b89a;background:transparent;font-size:22px;cursor:pointer;flex-shrink:0;">+</button>'+
