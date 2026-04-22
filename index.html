@@ -7,13 +7,17 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="PrepMacros" />
-  <meta name="theme-color" content="#3d2b1a" />
+  <meta name="theme-color" content="#5c3d2e" />
   <title>PrepMacros</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,600;1,900&family=DM+Sans:wght@400;500;700&display=swap" />
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { min-height: 100vh; background: #f5efe6; font-family: -apple-system, sans-serif; color: #3d2b1a; -webkit-font-smoothing: antialiased; }
-    button { -webkit-tap-highlight-color: transparent; cursor: pointer; font-family: -apple-system, sans-serif; }
-    input, select { font-family: -apple-system, sans-serif; }
+    html, body { min-height: 100vh; background: #faf6ef; font-family: 'DM Sans', -apple-system, sans-serif; color: #5c3d2e; -webkit-font-smoothing: antialiased; }
+    button { -webkit-tap-highlight-color: transparent; cursor: pointer; font-family: 'DM Sans', -apple-system, sans-serif; }
+    input, select { font-family: 'DM Sans', -apple-system, sans-serif; }
+    .pm-heading { font-family: 'Barlow Condensed', 'DM Sans', -apple-system, sans-serif; letter-spacing: 0.02em; }
     @keyframes spin { to { transform: rotate(360deg); } }
     @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
     @keyframes slideUp { from { transform:translateY(30px);opacity:0; } to { transform:translateY(0);opacity:1; } }
@@ -22,9 +26,9 @@
 </head>
 <body>
 <div id="app" style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;">
-  <div style="width:40px;height:40px;border:3px solid #e0d0ba;border-top-color:#c8a96e;border-radius:50%;animation:spin 0.8s linear infinite;"></div>
-  <div style="margin-top:16px;font-size:22px;font-weight:700;color:#3d2b1a;">PrepMacros</div>
-  <div style="margin-top:6px;font-size:13px;color:#a08060;">Loading your stock&hellip;</div>
+  <div style="width:40px;height:40px;border:3px solid #d9c9a8;border-top-color:#c8922a;border-radius:50%;animation:spin 0.8s linear infinite;"></div>
+  <div class="pm-heading" style="margin-top:16px;font-size:28px;font-weight:600;color:#5c3d2e;letter-spacing:0.04em;"><span style="color:#4a6fa5;font-weight:900;font-style:italic;">PREP</span> <span style="letter-spacing:0.22em;">MACROS</span></div>
+  <div style="margin-top:6px;font-size:13px;color:#8a7560;font-family:'DM Sans',sans-serif;">Loading your stock&hellip;</div>
 </div>
 
 <script>
@@ -59,7 +63,7 @@ function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')
 function daysSince(d){ if(!d)return null; return Math.floor((Date.now()-new Date(d))/86400000); }
 function daysAgo(d){ var n=daysSince(d); if(n===null)return null; if(n===0)return'today'; if(n===1)return'yesterday'; return n+'d ago'; }
 function todayStr(){ return new Date().toISOString().split('T')[0]; }
-function barColor(p){ return p>0.5?'#7a9e7e':p>0.25?'#c4a84b':'#b85c38'; }
+function barColor(p){ return p>0.5?'#6b7c5e':p>0.25?'#c4a84b':'#b85c38'; }
 function isDismissedToday(k){ return S.dismissedAlerts[k]===todayStr(); }
 function isArchived(it){ return !!it.archived; }
 function activeItems(){ return S.items.filter(function(it){return !isArchived(it);}); }
@@ -91,7 +95,7 @@ function progressBar(pct,color,bgColor){
   var clamped=Math.min(1,Math.max(0,pct));
   var over=pct>1;
   // If over target, cap bar at 100% width but use warmer colour
-  return '<div style="width:100%;height:8px;background:'+(bgColor||'#e8ddd0')+';border-radius:4px;overflow:hidden;">'+
+  return '<div style="width:100%;height:8px;background:'+(bgColor||'#eadec5')+';border-radius:4px;overflow:hidden;">'+
     '<div style="width:'+(clamped*100)+'%;height:100%;background:'+(over?'#e0a030':color)+';border-radius:4px;transition:width 0.3s;"></div>'+
     '</div>';
 }
@@ -180,7 +184,7 @@ function save(){
 function updateSyncBar(){
   var bar=ge('sync-bar');
   if(!bar)return;
-  var dotColor=S.syncStatus==='synced'?'#7a9e7e':S.syncStatus==='error'?'#b85c38':'#c8a96e';
+  var dotColor=S.syncStatus==='synced'?'#6b7c5e':S.syncStatus==='error'?'#b85c38':'#c8922a';
   var bgColor=S.syncStatus==='synced'?'rgba(122,158,126,0.15)':S.syncStatus==='error'?'rgba(184,92,56,0.15)':'rgba(200,169,110,0.2)';
   bar.style.background=bgColor;
   bar.innerHTML='<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:'+dotColor+';margin-right:6px;vertical-align:middle;'+(S.syncStatus==='syncing'?'animation:pulse 1s infinite;':'')+'"></span><span style="font-size:11px;color:'+dotColor+';">'+S.syncMsg+'</span>';
@@ -497,14 +501,14 @@ function importData(file){
 
 // ── Styles (reusable inline style strings) ────────────────────────────────────
 var cs = {
-  card: 'background:#fff8f0;border-radius:14px;border:1px solid #e0d0ba;overflow:hidden;margin-bottom:10px;',
-  cardExpired: 'background:#fff8f0;border-radius:14px;border:1.5px solid #b85c38;overflow:hidden;margin-bottom:10px;',
-  cardWarn: 'background:#fff8f0;border-radius:14px;border:1.5px solid #c4a84b;overflow:hidden;margin-bottom:10px;',
-  btnPrimary: 'background:#3d2b1a;color:#f0d9b5;border:none;border-radius:10px;padding:12px 16px;font-size:13px;font-weight:700;cursor:pointer;',
-  btnSecondary: 'background:transparent;color:#3d2b1a;border:1px solid #c8b89a;border-radius:10px;padding:12px 16px;font-size:13px;cursor:pointer;',
+  card: 'background:#ffffff;border-radius:14px;border:1px solid #d9c9a8;overflow:hidden;margin-bottom:10px;',
+  cardExpired: 'background:#ffffff;border-radius:14px;border:1.5px solid #b85c38;overflow:hidden;margin-bottom:10px;',
+  cardWarn: 'background:#ffffff;border-radius:14px;border:1.5px solid #c4a84b;overflow:hidden;margin-bottom:10px;',
+  btnPrimary: 'background:#5c3d2e;color:#faf6ef;border:none;border-radius:10px;padding:12px 16px;font-size:13px;font-weight:700;cursor:pointer;',
+  btnSecondary: 'background:transparent;color:#5c3d2e;border:1px solid #d9c9a8;border-radius:10px;padding:12px 16px;font-size:13px;cursor:pointer;',
   btnDanger: 'background:transparent;color:#b85c38;border:1px solid #b85c38;border-radius:10px;padding:8px 10px;font-size:13px;cursor:pointer;',
-  label: 'display:block;font-size:11px;color:#7a5c3a;margin-bottom:4px;margin-top:14px;text-transform:uppercase;letter-spacing:0.5px;font-weight:700;',
-  input: 'width:100%;padding:11px 14px;border-radius:10px;border:1px solid #d4c4a8;background:#fff8f0;font-size:15px;color:#3d2b1a;outline:none;-webkit-appearance:none;box-sizing:border-box;',
+  label: 'display:block;font-size:11px;color:#5c3d2e;margin-bottom:4px;margin-top:14px;text-transform:uppercase;letter-spacing:0.5px;font-weight:700;',
+  input: 'width:100%;padding:11px 14px;border-radius:10px;border:1px solid #d9c9a8;background:#ffffff;font-size:15px;color:#5c3d2e;outline:none;-webkit-appearance:none;box-sizing:border-box;',
   tag: 'border-radius:10px;padding:2px 8px;font-size:11px;',
 };
 
@@ -517,10 +521,10 @@ function render(){
   var macros=todayMacros(); var alerts=getAlerts(); var low=lowC(); var out=outC();
 
   // ── Header
-  var header='<div style="background:#3d2b1a;padding:'+safeTop+' 20px 0;position:sticky;top:0;z-index:100;">';
+  var header='<div style="background:#5c3d2e;padding:'+safeTop+' 20px 0;position:sticky;top:0;z-index:100;">';
 
   // Sync bar
-  var dotColor=S.syncStatus==='synced'?'#7a9e7e':S.syncStatus==='error'?'#b85c38':'#c8a96e';
+  var dotColor=S.syncStatus==='synced'?'#6b7c5e':S.syncStatus==='error'?'#b85c38':'#c8922a';
   var bgColor=S.syncStatus==='synced'?'rgba(122,158,126,0.15)':S.syncStatus==='error'?'rgba(184,92,56,0.15)':'rgba(200,169,110,0.2)';
   header+='<div id="sync-bar" style="background:'+bgColor+';padding:3px 0;text-align:center;">';
   header+='<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:'+dotColor+';margin-right:6px;vertical-align:middle;'+(S.syncStatus==='syncing'?'animation:pulse 1s infinite;':'')+'"></span>';
@@ -528,13 +532,17 @@ function render(){
 
   // Title row
   header+='<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0 8px;">';
-  header+='<div><div style="font-size:20px;font-weight:700;color:#f0d9b5;">PrepMacros</div></div>';
+  header+='<div><div class="pm-heading" style="font-size:26px;line-height:1;color:#faf6ef;display:flex;align-items:center;gap:8px;">';
+  header+='<span style="color:#4a6fa5;font-weight:900;font-style:italic;letter-spacing:0.05em;">PREP</span>';
+  header+='<span style="display:inline-block;width:2px;height:18px;background:#c8922a;"></span>';
+  header+='<span style="color:#faf6ef;font-weight:600;letter-spacing:0.22em;">MACROS</span>';
+  header+='</div></div>';
   header+='<div style="display:flex;gap:6px;align-items:center;">';
 
   // Targets-aware macro widget: 4 rings if targets set, otherwise fallback pill
   if(hasTargets()){
     var m=macros||{cal:0,protein:0,carbs:0,fat:0};
-    var ringColors={cal:'#7b8ed6',protein:'#b85c38',carbs:'#c8a96e',fat:'#7a9e7e'};
+    var ringColors={cal:'#4a6fa5',protein:'#a84f2e',carbs:'#c8922a',fat:'#6b7c5e'};
     var tgts=[
       ['cal',m.cal,S.settings.targetCal,ringColors.cal],
       ['protein',m.protein,S.settings.targetProtein,ringColors.protein],
@@ -550,12 +558,12 @@ function render(){
     });
     header+='</button>';
   } else if(macros){
-    header+='<div style="background:rgba(255,255,255,0.1);border-radius:20px;padding:4px 10px;text-align:center;"><div style="font-size:14px;font-weight:700;color:#c8a96e;">'+macros.cal+'</div><div style="font-size:9px;color:#c8b89a;text-transform:uppercase;">Cal today</div></div>';
+    header+='<div style="background:rgba(255,255,255,0.1);border-radius:20px;padding:4px 10px;text-align:center;"><div style="font-size:14px;font-weight:700;color:#c8922a;">'+macros.cal+'</div><div style="font-size:9px;color:#d9c9a8;text-transform:uppercase;">Cal today</div></div>';
   }
 
-  if(low)header+='<button onclick="jumpToLowStock()" style="background:rgba(255,255,255,0.1);border:none;border-radius:20px;padding:4px 10px;text-align:center;cursor:pointer;"><div style="font-size:14px;font-weight:700;color:#d4a843;">'+low+'</div><div style="font-size:9px;color:#c8b89a;text-transform:uppercase;">Low</div></button>';
-  if(out)header+='<button onclick="jumpToOutStock()" style="background:rgba(255,255,255,0.1);border:none;border-radius:20px;padding:4px 10px;text-align:center;cursor:pointer;"><div style="font-size:14px;font-weight:700;color:#b85c38;">'+out+'</div><div style="font-size:9px;color:#c8b89a;text-transform:uppercase;">Out</div></button>';
-  if(alerts.length)header+='<div style="background:rgba(255,255,255,0.1);border-radius:20px;padding:4px 10px;text-align:center;"><div style="font-size:14px;font-weight:700;color:#e0a030;">'+alerts.length+'</div><div style="font-size:9px;color:#c8b89a;text-transform:uppercase;">Alerts</div></div>';
+  if(low)header+='<button onclick="jumpToLowStock()" style="background:rgba(255,255,255,0.1);border:none;border-radius:20px;padding:4px 10px;text-align:center;cursor:pointer;"><div style="font-size:14px;font-weight:700;color:#d4a843;">'+low+'</div><div style="font-size:9px;color:#d9c9a8;text-transform:uppercase;">Low</div></button>';
+  if(out)header+='<button onclick="jumpToOutStock()" style="background:rgba(255,255,255,0.1);border:none;border-radius:20px;padding:4px 10px;text-align:center;cursor:pointer;"><div style="font-size:14px;font-weight:700;color:#b85c38;">'+out+'</div><div style="font-size:9px;color:#d9c9a8;text-transform:uppercase;">Out</div></button>';
+  if(alerts.length)header+='<div style="background:rgba(255,255,255,0.1);border-radius:20px;padding:4px 10px;text-align:center;"><div style="font-size:14px;font-weight:700;color:#e0a030;">'+alerts.length+'</div><div style="font-size:9px;color:#d9c9a8;text-transform:uppercase;">Alerts</div></div>';
   header+='</div></div>';
 
   // Today strip
@@ -569,9 +577,9 @@ function render(){
       var label=m[0],val=m[1],tgt=m[2],sfx=m[3];
       header+='<div style="text-align:center;flex-shrink:0;min-width:0;">';
       if(tgt>0){
-        header+='<div style="font-size:13px;color:#f0d9b5;line-height:1.2;"><span style="font-weight:600;">'+val+sfx+'</span><span style="color:#a8998a;font-weight:400;"> / '+tgt+sfx+'</span></div>';
+        header+='<div style="font-size:13px;color:#faf6ef;line-height:1.2;"><span style="font-weight:600;">'+val+sfx+'</span><span style="color:#a8998a;font-weight:400;"> / '+tgt+sfx+'</span></div>';
       } else {
-        header+='<div style="font-size:13px;color:#f0d9b5;font-weight:600;line-height:1.2;">'+val+sfx+'</div>';
+        header+='<div style="font-size:13px;color:#faf6ef;font-weight:600;line-height:1.2;">'+val+sfx+'</div>';
       }
       header+='<div style="font-size:9px;color:#a8998a;text-transform:uppercase;letter-spacing:0.5px;margin-top:2px;">'+label+'</div>';
       header+='</div>';
@@ -584,7 +592,7 @@ function render(){
     header+='<div style="background:#fdf6e3;border-top:1px solid rgba(200,160,60,0.25);padding:6px 16px;">';
     alerts.forEach(function(a){
       header+='<div style="display:flex;align-items:center;padding:5px 0;border-bottom:1px solid rgba(0,0,0,0.05);">';
-      header+='<div style="flex:1;font-size:13px;color:#5a4010;">'+a.msg+'</div>';
+      header+='<div style="flex:1;font-size:13px;color:#5c3d2e;">'+a.msg+'</div>';
       header+='<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:'+a.col+'22;color:'+a.col+';margin-left:8px;">'+a.badge+'</span>';
       header+='<button onclick="dismissAlert(\''+a.key+'\')" style="background:none;border:none;font-size:15px;color:#b09050;cursor:pointer;padding:0 2px 0 8px;">&#x2715;</button>';
       header+='</div>';
@@ -597,11 +605,11 @@ function render(){
   var navItems=[['stock','Stock'],['add','+ Prep'],['log','Log'],['today','Today'],['history','History']];
   navItems.forEach(function(v){
     var active=S.view===v[0];
-    header+='<button onclick="setView(\''+v[0]+'\')" style="flex:1;padding:8px 4px;border-radius:8px;border:none;font-size:12px;cursor:pointer;background:'+(active?'#c8a96e':'rgba(255,255,255,0.08)')+';color:'+(active?'#3d2b1a':'#d4c4a8')+';font-weight:'+(active?'700':'400')+';">'+v[1]+'</button>';
+    header+='<button onclick="setView(\''+v[0]+'\')" style="flex:1;padding:8px 4px;border-radius:8px;border:none;font-size:12px;cursor:pointer;background:'+(active?'#c8922a':'rgba(255,255,255,0.08)')+';color:'+(active?'#5c3d2e':'#d9c9a8')+';font-weight:'+(active?'700':'400')+';">'+v[1]+'</button>';
   });
   // Settings icon - separate, smaller, pushed to the side
   var sActive=S.view==='settings';
-  header+='<button onclick="setView(\'settings\')" style="width:36px;padding:8px 0;border-radius:8px;border:none;font-size:14px;cursor:pointer;background:'+(sActive?'#c8a96e':'rgba(255,255,255,0.08)')+';margin-left:4px;flex-shrink:0;">⚙️</button>';
+  header+='<button onclick="setView(\'settings\')" style="width:36px;padding:8px 0;border-radius:8px;border:none;font-size:14px;cursor:pointer;background:'+(sActive?'#c8922a':'rgba(255,255,255,0.08)')+';margin-left:4px;flex-shrink:0;">⚙️</button>';
   header+='</div></div>';
 
   // ── Main content
@@ -658,9 +666,9 @@ function renderStock(){
   // Archived banner + toggle
   var archCount=archivedC();
   if(S.showArchived){
-    h+='<div style="background:#f0e6d4;border-radius:10px;padding:10px 14px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;">';
-    h+='<div style="font-size:13px;color:#5a3e2a;"><strong>Viewing archived</strong> ('+archCount+' item'+(archCount!==1?'s':'')+')</div>';
-    h+='<button onclick="S.showArchived=false;render();" style="background:#3d2b1a;color:#f0d9b5;border:none;border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;">Back to stock</button>';
+    h+='<div style="background:#f5ecd9;border-radius:10px;padding:10px 14px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;">';
+    h+='<div style="font-size:13px;color:#5c3d2e;"><strong>Viewing archived</strong> ('+archCount+' item'+(archCount!==1?'s':'')+')</div>';
+    h+='<button onclick="S.showArchived=false;render();" style="background:#5c3d2e;color:#faf6ef;border:none;border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;">Back to stock</button>';
     h+='</div>';
   }
 
@@ -668,8 +676,8 @@ function renderStock(){
   if(!S.showArchived && S.stockFilter!=='all'){
     var label=S.stockFilter==='low'?'Showing low-stock items':'Showing out-of-stock items';
     h+='<div style="background:#fdf6e3;border-radius:10px;padding:10px 14px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;">';
-    h+='<div style="font-size:13px;color:#5a4010;">'+label+'</div>';
-    h+='<button onclick="S.stockFilter=\'all\';render();" style="background:transparent;border:1px solid #c8b89a;color:#5a4010;border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;">Show all</button>';
+    h+='<div style="font-size:13px;color:#5c3d2e;">'+label+'</div>';
+    h+='<button onclick="S.stockFilter=\'all\';render();" style="background:transparent;border:1px solid #d9c9a8;color:#5c3d2e;border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;">Show all</button>';
     h+='</div>';
   }
 
@@ -679,26 +687,26 @@ function renderStock(){
     CATS.forEach(function(c){
       var active=S.filterCat===c;
       var count=c==='All'?activeItems().length:activeItems().filter(function(it){return it.category===c;}).length;
-      var badgeBg=active?'rgba(240,217,181,0.25)':'#f0e6d4';
-      var badgeColor=active?'#f0d9b5':'#7a5c3a';
+      var badgeBg=active?'rgba(240,217,181,0.25)':'#f5ecd9';
+      var badgeColor=active?'#faf6ef':'#5c3d2e';
       var badge=count>0?'<span style="background:'+badgeBg+';border-radius:10px;padding:1px 7px;margin-left:6px;font-size:11px;font-weight:700;color:'+badgeColor+';">'+count+'</span>':'';
-      h+='<button onclick="S.filterCat=\''+c+'\';render();" style="padding:5px 12px;border-radius:20px;white-space:nowrap;font-size:12px;border:'+(active?'none':'1px solid #e8ddd0')+';background:'+(active?'#3d2b1a':'transparent')+';color:'+(active?'#f0d9b5':'#7a5c3a')+';display:inline-flex;align-items:center;">'+c+badge+'</button>';
+      h+='<button onclick="S.filterCat=\''+c+'\';render();" style="padding:5px 12px;border-radius:20px;white-space:nowrap;font-size:12px;border:'+(active?'none':'1px solid #eadec5')+';background:'+(active?'#5c3d2e':'transparent')+';color:'+(active?'#faf6ef':'#5c3d2e')+';display:inline-flex;align-items:center;">'+c+badge+'</button>';
     });
     h+='</div>';
   }
 
   // Reorder mode banner
   if(S.reorderMode){
-    h+='<div style="background:#f0e6d4;border-radius:10px;padding:10px 14px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;">';
-    h+='<div style="font-size:13px;color:#5a3e2a;"><strong>Reorder mode</strong> — use ▲▼ to rearrange</div>';
-    h+='<button onclick="exitReorderMode()" style="background:#3d2b1a;color:#f0d9b5;border:none;border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;">Done</button>';
+    h+='<div style="background:#f5ecd9;border-radius:10px;padding:10px 14px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;">';
+    h+='<div style="font-size:13px;color:#5c3d2e;"><strong>Reorder mode</strong> — use ▲▼ to rearrange</div>';
+    h+='<button onclick="exitReorderMode()" style="background:#5c3d2e;color:#faf6ef;border:none;border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;">Done</button>';
     h+='</div>';
   }
 
   if(!items.length){
-    h+='<div style="text-align:center;padding:48px 20px;color:#a08060;">';
+    h+='<div style="text-align:center;padding:48px 20px;color:#8a7560;">';
     h+='<div style="font-size:40px;margin-bottom:12px;">'+(S.showArchived?'📦':'🥡')+'</div>';
-    h+='<div style="font-size:18px;font-weight:700;margin-bottom:6px;color:#7a5c3a;">'+(S.showArchived?'No archived items':(S.stockFilter==='low'?'Nothing low':(S.stockFilter==='out'?'Nothing out of stock':'No items yet')))+'</div>';
+    h+='<div style="font-size:18px;font-weight:700;margin-bottom:6px;color:#5c3d2e;">'+(S.showArchived?'No archived items':(S.stockFilter==='low'?'Nothing low':(S.stockFilter==='out'?'Nothing out of stock':'No items yet')))+'</div>';
     if(!S.showArchived && S.stockFilter==='all') h+='<div style="font-size:13px;">Tap &quot;+ Add&quot; to log your first prep batch</div>';
     h+='</div>';
   } else if(S.reorderMode){
@@ -712,8 +720,8 @@ function renderStock(){
   // Archive access footer + Reorder toggle (only on default stock view)
   if(!S.showArchived && S.stockFilter==='all' && !S.reorderMode){
     h+='<div style="display:flex;gap:8px;margin-top:16px;">';
-    if(items.length>1) h+='<button onclick="enterReorderMode()" style="flex:1;background:transparent;border:1px dashed #c8b89a;color:#7a5c3a;border-radius:10px;padding:10px;font-size:13px;cursor:pointer;">↕ Reorder</button>';
-    if(archCount>0) h+='<button onclick="S.showArchived=true;S.expandedId=null;render();" style="flex:1;background:transparent;border:1px dashed #c8b89a;color:#7a5c3a;border-radius:10px;padding:10px;font-size:13px;cursor:pointer;">📁 Archived ('+archCount+')</button>';
+    if(items.length>1) h+='<button onclick="enterReorderMode()" style="flex:1;background:transparent;border:1px dashed #d9c9a8;color:#5c3d2e;border-radius:10px;padding:10px;font-size:13px;cursor:pointer;">↕ Reorder</button>';
+    if(archCount>0) h+='<button onclick="S.showArchived=true;S.expandedId=null;render();" style="flex:1;background:transparent;border:1px dashed #d9c9a8;color:#5c3d2e;border-radius:10px;padding:10px;font-size:13px;cursor:pointer;">📁 Archived ('+archCount+')</button>';
     h+='</div>';
   }
 
@@ -728,18 +736,18 @@ function renderCard(it){
   var age=daysSince(it.prepDate);
   var isExp=!!(expDays&&age>=expDays), isExpW=!isExp&&!!(expDays&&age>=expDays-1);
   var sinceEat=daysSince(it.lastEaten||it.prepDate), isFgt=sinceEat>=S.settings.forgottenDays;
-  var borderColor=isExp?'#b85c38':isExpW||isLow?'#c4a84b':'#e0d0ba';
-  var portColor=oos?'#b85c38':isLow?'#c4a84b':'#3d2b1a';
+  var borderColor=isExp?'#b85c38':isExpW||isLow?'#c4a84b':'#d9c9a8';
+  var portColor=oos?'#b85c38':isLow?'#c4a84b':'#5c3d2e';
 
-  var h='<div style="background:#fff8f0;border-radius:14px;border:1.5px solid '+borderColor+';overflow:hidden;margin-bottom:10px;">';
+  var h='<div style="background:#ffffff;border-radius:14px;border:1.5px solid '+borderColor+';overflow:hidden;margin-bottom:10px;">';
 
   // Header row (tappable)
   h+='<div onclick="toggleExpand(\''+it.id+'\')" style="padding:14px 16px;cursor:pointer;">';
   h+='<div style="display:flex;justify-content:space-between;align-items:flex-start;">';
   h+='<div style="flex:1;min-width:0;">';
   h+='<div style="font-weight:700;font-size:16px;">'+esc(it.name)+'</div>';
-  h+='<div style="font-size:11px;color:#a08060;margin-top:4px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;">';
-  h+='<span style="background:#f0e6d4;border-radius:10px;padding:2px 8px;color:#7a5c3a;">'+esc(it.category)+'</span>';
+  h+='<div style="font-size:11px;color:#8a7560;margin-top:4px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;">';
+  h+='<span style="background:#f5ecd9;border-radius:10px;padding:2px 8px;color:#5c3d2e;">'+esc(it.category)+'</span>';
   if(isExp) h+='<span style="background:#ffe8e0;border-radius:10px;padding:2px 8px;color:#8a2010;">⚠️ Expired</span>';
   else if(isExpW) h+='<span style="background:#fff0cc;border-radius:10px;padding:2px 8px;color:#8a6010;">🕐 Exp. soon</span>';
   else h+='<span>prepped '+(daysAgo(it.prepDate)||'—')+'</span>';
@@ -752,28 +760,28 @@ function renderCard(it){
   var displayNum=u==='portions'?it.portions:it.portions;
   var displayLbl=u==='portions'?'portions':u;
   h+='<div style="font-size:24px;font-weight:700;line-height:1;color:'+portColor+';">'+displayNum+'</div>';
-  h+='<div style="font-size:10px;color:#a08060;">'+displayLbl+'</div></div></div>';
+  h+='<div style="font-size:10px;color:#8a7560;">'+displayLbl+'</div></div></div>';
   // Progress bar
-  h+='<div style="background:#e8ddd0;border-radius:4px;height:5px;margin-top:10px;">';
+  h+='<div style="background:#eadec5;border-radius:4px;height:5px;margin-top:10px;">';
   h+='<div style="width:'+Math.max(2,pct*100)+'%;height:100%;border-radius:4px;background:'+barColor(pct)+';"></div></div>';
   h+='</div>'; // end header
 
   if(exp){
-    h+='<div style="padding:0 16px 14px;border-top:1px solid #f0e6d4;">';
+    h+='<div style="padding:0 16px 14px;border-top:1px solid #f5ecd9;">';
     if(it.macros&&it.macros.cal){
       var u=unitOf(it);
       var macroLabel=u==='portions'?'Per portion':'Per 100'+u;
-      h+='<div style="font-size:11px;color:#a08060;margin-top:12px;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.5px;">'+macroLabel+'</div>';
+      h+='<div style="font-size:11px;color:#8a7560;margin-top:12px;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.5px;">'+macroLabel+'</div>';
       h+='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:12px;">';
       [['Cal',it.macros.cal],['Protein',it.macros.protein+'g'],['Carbs',it.macros.carbs+'g'],['Fat',it.macros.fat+'g']].forEach(function(m){
-        h+='<div style="background:#f0e6d4;border-radius:8px;padding:6px 4px;text-align:center;">';
+        h+='<div style="background:#f5ecd9;border-radius:8px;padding:6px 4px;text-align:center;">';
         h+='<div style="font-size:13px;font-weight:700;">'+m[1]+'</div>';
-        h+='<div style="font-size:10px;color:#a08060;">'+m[0]+'</div></div>';
+        h+='<div style="font-size:10px;color:#8a7560;">'+m[0]+'</div></div>';
       });
       h+='</div>';
     }
-    if(it.notes) h+='<div style="font-size:12px;color:#7a5c3a;margin-bottom:10px;font-style:italic;">&quot;'+esc(it.notes)+'&quot;</div>';
-    if(expDays&&!isArchived(it)) h+='<div style="font-size:12px;color:#a08060;margin-bottom:10px;">Expiry: '+expDays+' days &middot; '+(isExp?'<span style="color:#b85c38;font-weight:700;">Expired</span>':(expDays-age)+'d remaining')+'</div>';
+    if(it.notes) h+='<div style="font-size:12px;color:#5c3d2e;margin-bottom:10px;font-style:italic;">&quot;'+esc(it.notes)+'&quot;</div>';
+    if(expDays&&!isArchived(it)) h+='<div style="font-size:12px;color:#8a7560;margin-bottom:10px;">Expiry: '+expDays+' days &middot; '+(isExp?'<span style="color:#b85c38;font-weight:700;">Expired</span>':(expDays-age)+'d remaining')+'</div>';
 
     if(isArchived(it)){
       // Archived items get a simpler action row
@@ -846,13 +854,13 @@ function moveItem(id,direction){
 
 function renderReorderCard(it){
   var u=unitOf(it);
-  var h='<div style="background:#fff8f0;border:1px solid #e0d0ba;border-radius:12px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:12px;">';
+  var h='<div style="background:#ffffff;border:1px solid #d9c9a8;border-radius:12px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:12px;">';
   h+='<div style="flex:1;min-width:0;">';
   h+='<div style="font-weight:700;font-size:15px;">'+esc(it.name)+'</div>';
-  h+='<div style="font-size:12px;color:#a08060;">'+esc(it.category)+' · '+it.portions+(u==='portions'?' portions':u)+'</div>';
+  h+='<div style="font-size:12px;color:#8a7560;">'+esc(it.category)+' · '+it.portions+(u==='portions'?' portions':u)+'</div>';
   h+='</div>';
-  h+='<button onclick="moveItem(\''+it.id+'\',-1)" style="width:36px;height:36px;border-radius:8px;border:1px solid #c8b89a;background:transparent;font-size:16px;cursor:pointer;flex-shrink:0;">▲</button>';
-  h+='<button onclick="moveItem(\''+it.id+'\',1)" style="width:36px;height:36px;border-radius:8px;border:1px solid #c8b89a;background:transparent;font-size:16px;cursor:pointer;flex-shrink:0;">▼</button>';
+  h+='<button onclick="moveItem(\''+it.id+'\',-1)" style="width:36px;height:36px;border-radius:8px;border:1px solid #d9c9a8;background:transparent;font-size:16px;cursor:pointer;flex-shrink:0;">▲</button>';
+  h+='<button onclick="moveItem(\''+it.id+'\',1)" style="width:36px;height:36px;border-radius:8px;border:1px solid #d9c9a8;background:transparent;font-size:16px;cursor:pointer;flex-shrink:0;">▼</button>';
   h+='</div>';
   return h;
 }
@@ -863,7 +871,7 @@ function renderAdd(){
   var u=f.unit||'portions';
   var amountLabel=u==='portions'?'Portions prepped':'Amount prepped ('+u+')';
   var macroLabel=u==='portions'?'Macros per portion':'Macros per 100'+u;
-  var h='<div style="font-size:22px;font-weight:700;margin-bottom:18px;">Prep Session Builder</div>';
+  var h='<div class="pm-heading" style="font-size:28px;font-weight:600;margin-bottom:18px;letter-spacing:0.04em;">Prep Session Builder</div>';
   h+='<label style="'+cs.label+'">Item name</label>';
   h+='<input id="f-name" tabindex="1" style="'+cs.input+'" value="'+esc(f.name)+'" placeholder="e.g. Shawarma Chicken" />';
   h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">';
@@ -880,7 +888,7 @@ function renderAdd(){
   h+='<div><label style="'+cs.label+'">'+amountLabel+'</label><input id="f-portions" tabindex="4" type="number" inputmode="decimal" style="'+cs.input+'" value="'+esc(f.portions)+'" placeholder="'+(u==='portions'?'e.g. 12':'e.g. 500')+'" min="1" /></div>';
   h+='<div><label style="'+cs.label+'">Expires after (days)</label><input id="f-expiry" tabindex="5" type="number" inputmode="decimal" style="'+cs.input+'" value="'+esc(f.expiryDays)+'" placeholder="default: '+S.settings.expiryDays+'" min="1" /></div>';
   h+='</div>';
-  h+='<div style="font-size:15px;font-weight:700;margin:18px 0 2px;color:#5a3e2a;">'+macroLabel+' <span style="font-size:12px;color:#a08060;font-weight:400;">(optional)</span></div>';
+  h+='<div style="font-size:15px;font-weight:700;margin:18px 0 2px;color:#5c3d2e;">'+macroLabel+' <span style="font-size:12px;color:#8a7560;font-weight:400;">(optional)</span></div>';
   h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">';
   var macroFields=[['f-cal','Calories',f.cal,6],['f-protein','Protein (g)',f.protein,7],['f-carbs','Carbs (g)',f.carbs,8],['f-fat','Fat (g)',f.fat,9]];
   macroFields.forEach(function(m){
@@ -924,11 +932,11 @@ function renderLog(){
     var rb=b.totalPortions>0?b.portions/b.totalPortions:0;
     return rb-ra;
   });
-  var h='<div style="font-size:22px;font-weight:700;margin-bottom:6px;">Food Log</div>';
-  h+='<div style="color:#7a5c3a;font-size:13px;margin-bottom:16px;">Tap an item to deduct from stock or log a manual entry</div>';
+  var h='<div class="pm-heading" style="font-size:28px;font-weight:600;margin-bottom:6px;letter-spacing:0.04em;">Food Log</div>';
+  h+='<div style="color:#5c3d2e;font-size:13px;margin-bottom:16px;">Tap an item to deduct from stock or log a manual entry</div>';
 
   // Manual entry button (above category pills)
-  h+='<button onclick="openManualEntry()" style="background:transparent;border:1px dashed #c8b89a;color:#7a5c3a;border-radius:10px;padding:12px;width:100%;font-size:13px;cursor:pointer;margin-bottom:14px;">+ Add manual entry</button>';
+  h+='<button onclick="openManualEntry()" style="background:transparent;border:1px dashed #d9c9a8;color:#5c3d2e;border-radius:10px;padding:12px;width:100%;font-size:13px;cursor:pointer;margin-bottom:14px;">+ Add manual entry</button>';
 
   // Category filter pills
   if(avail.length){
@@ -937,25 +945,25 @@ function renderLog(){
       var active=S.filterCat===c;
       var count=c==='All'?avail.length:avail.filter(function(it){return it.category===c;}).length;
       if(c!=='All' && count===0) return; // Hide empty categories in Log view to reduce clutter
-      var badgeBg=active?'rgba(240,217,181,0.25)':'#f0e6d4';
-      var badgeColor=active?'#f0d9b5':'#7a5c3a';
+      var badgeBg=active?'rgba(240,217,181,0.25)':'#f5ecd9';
+      var badgeColor=active?'#faf6ef':'#5c3d2e';
       var badge=count>0?'<span style="background:'+badgeBg+';border-radius:10px;padding:1px 7px;margin-left:6px;font-size:11px;font-weight:700;color:'+badgeColor+';">'+count+'</span>':'';
-      h+='<button onclick="S.filterCat=\''+c+'\';render();" style="padding:5px 12px;border-radius:20px;white-space:nowrap;font-size:12px;border:'+(active?'none':'1px solid #e8ddd0')+';background:'+(active?'#3d2b1a':'transparent')+';color:'+(active?'#f0d9b5':'#7a5c3a')+';display:inline-flex;align-items:center;">'+c+badge+'</button>';
+      h+='<button onclick="S.filterCat=\''+c+'\';render();" style="padding:5px 12px;border-radius:20px;white-space:nowrap;font-size:12px;border:'+(active?'none':'1px solid #eadec5')+';background:'+(active?'#5c3d2e':'transparent')+';color:'+(active?'#faf6ef':'#5c3d2e')+';display:inline-flex;align-items:center;">'+c+badge+'</button>';
     });
     h+='</div>';
   }
 
   if(!avail.length){
-    h+='<div style="text-align:center;padding:48px 20px;color:#a08060;"><div style="font-size:40px;margin-bottom:12px;">😅</div>';
-    h+='<div style="font-size:18px;font-weight:700;margin-bottom:6px;color:#7a5c3a;">No stock available</div>';
+    h+='<div style="text-align:center;padding:48px 20px;color:#8a7560;"><div style="font-size:40px;margin-bottom:12px;">😅</div>';
+    h+='<div style="font-size:18px;font-weight:700;margin-bottom:6px;color:#5c3d2e;">No stock available</div>';
     h+='<div style="font-size:13px;">Time to prep!</div></div>';
     return h;
   }
 
   if(!filtered.length){
-    h+='<div style="text-align:center;padding:32px 20px;color:#a08060;">';
+    h+='<div style="text-align:center;padding:32px 20px;color:#8a7560;">';
     h+='<div style="font-size:14px;">Nothing in '+esc(S.filterCat)+' available.</div>';
-    h+='<button onclick="S.filterCat=\'All\';render();" style="margin-top:12px;background:transparent;border:1px solid #c8b89a;color:#7a5c3a;border-radius:8px;padding:6px 14px;font-size:13px;cursor:pointer;">Show all</button>';
+    h+='<button onclick="S.filterCat=\'All\';render();" style="margin-top:12px;background:transparent;border:1px solid #d9c9a8;color:#5c3d2e;border-radius:8px;padding:6px 14px;font-size:13px;cursor:pointer;">Show all</button>';
     h+='</div>';
     return h;
   }
@@ -967,10 +975,10 @@ function renderLog(){
     if(it.macros&&it.macros.cal){
       macrosMeta=' · '+it.macros.cal+' cal, '+it.macros.protein+'g pro '+(u==='portions'?'per portion':'per 100'+u);
     }
-    h+='<button onclick="openLogModal(\''+it.id+'\')" style="background:#fff8f0;border:1px solid '+(fgt?'#9080c0':'#e0d0ba')+';border-radius:12px;padding:14px 16px;width:100%;text-align:left;cursor:pointer;display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">';
-    h+='<div><div style="font-weight:700;font-size:15px;color:#3d2b1a;">'+esc(it.name)+(fgt?' 💤':'')+'</div>';
-    h+='<div style="font-size:12px;color:#7a5c3a;margin-top:2px;">'+esc(it.category)+macrosMeta+'</div></div>';
-    h+='<div style="background:#3d2b1a;color:#f0d9b5;border-radius:20px;padding:4px 14px;font-size:14px;font-weight:700;flex-shrink:0;">'+it.portions+(u==='portions'?'':u)+'</div>';
+    h+='<button onclick="openLogModal(\''+it.id+'\')" style="background:#ffffff;border:1px solid '+(fgt?'#9080c0':'#d9c9a8')+';border-radius:12px;padding:14px 16px;width:100%;text-align:left;cursor:pointer;display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">';
+    h+='<div><div style="font-weight:700;font-size:15px;color:#5c3d2e;">'+esc(it.name)+(fgt?' 💤':'')+'</div>';
+    h+='<div style="font-size:12px;color:#5c3d2e;margin-top:2px;">'+esc(it.category)+macrosMeta+'</div></div>';
+    h+='<div style="background:#5c3d2e;color:#faf6ef;border-radius:20px;padding:4px 14px;font-size:14px;font-weight:700;flex-shrink:0;">'+it.portions+(u==='portions'?'':u)+'</div>';
     h+='</button>';
   });
   return h;
@@ -981,21 +989,21 @@ function renderToday(){
   var t=todayStr();
   var todays=S.history.filter(function(x){return x.date&&x.date.indexOf(t)===0;});
   var macros=todayMacros();
-  var h='<div style="font-size:22px;font-weight:700;margin-bottom:6px;">Today</div>';
-  h+='<div style="color:#7a5c3a;font-size:13px;margin-bottom:16px;">'+new Date().toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'})+'</div>';
+  var h='<div class="pm-heading" style="font-size:28px;font-weight:600;margin-bottom:6px;letter-spacing:0.04em;">Today</div>';
+  h+='<div style="color:#5c3d2e;font-size:13px;margin-bottom:16px;">'+new Date().toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'})+'</div>';
 
   // Macro summary / gauges card
   var sm=macros||{cal:0,protein:0,carbs:0,fat:0};
   var showCard=macros||hasTargets();
   if(showCard){
-    var ringColors={cal:'#7b8ed6',protein:'#b85c38',carbs:'#c8a96e',fat:'#7a9e7e'};
-    h+='<div style="background:#fff8f0;border:1px solid #e0d0ba;border-radius:14px;padding:16px;margin-bottom:20px;">';
+    var ringColors={cal:'#4a6fa5',protein:'#a84f2e',carbs:'#c8922a',fat:'#6b7c5e'};
+    h+='<div style="background:#ffffff;border:1px solid #d9c9a8;border-radius:14px;padding:16px;margin-bottom:20px;">';
 
     if(hasTargets()){
       // Detailed gauges when targets are set
       h+='<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:14px;">';
-      h+='<div style="font-size:11px;color:#a08060;text-transform:uppercase;letter-spacing:0.5px;">Daily targets</div>';
-      h+='<button onclick="setView(\'settings\')" style="background:none;border:none;font-size:11px;color:#a08060;cursor:pointer;padding:0;">Adjust ›</button>';
+      h+='<div style="font-size:11px;color:#8a7560;text-transform:uppercase;letter-spacing:0.5px;">Daily targets</div>';
+      h+='<button onclick="setView(\'settings\')" style="background:none;border:none;font-size:11px;color:#8a7560;cursor:pointer;padding:0;">Adjust ›</button>';
       h+='</div>';
 
       var macroRows=[
@@ -1012,15 +1020,15 @@ function renderToday(){
         var rightLabel, rightColor;
         if(remaining>=0){
           rightLabel=remaining+sfx+' left';
-          rightColor='#7a5c3a';
+          rightColor='#5c3d2e';
         } else {
           rightLabel=Math.abs(remaining)+sfx+' over';
           rightColor='#b85c38';
         }
         h+='<div style="margin-bottom:'+(i<macroRows.length-1?'14px':'0')+';">';
         h+='<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;">';
-        h+='<div style="font-size:13px;font-weight:700;color:#3d2b1a;">'+label+'</div>';
-        h+='<div style="font-size:13px;color:'+rightColor+';"><strong>'+val+sfx+'</strong> <span style="color:#a08060;"> / '+tgt+sfx+'</span></div>';
+        h+='<div style="font-size:13px;font-weight:700;color:#5c3d2e;">'+label+'</div>';
+        h+='<div style="font-size:13px;color:'+rightColor+';"><strong>'+val+sfx+'</strong> <span style="color:#8a7560;"> / '+tgt+sfx+'</span></div>';
         h+='</div>';
         h+=progressBar(pct,col);
         h+='<div style="text-align:right;font-size:11px;color:'+rightColor+';margin-top:3px;">'+rightLabel+'</div>';
@@ -1029,25 +1037,25 @@ function renderToday(){
       // For any macros without a target set, show them as a simple row
       var untargeted=macroRows.filter(function(r){return r[2]<=0;});
       if(untargeted.length && macros){
-        h+='<div style="border-top:1px solid #f0e6d4;margin-top:12px;padding-top:12px;">';
-        h+='<div style="font-size:10px;color:#a08060;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">No target set</div>';
+        h+='<div style="border-top:1px solid #f5ecd9;margin-top:12px;padding-top:12px;">';
+        h+='<div style="font-size:10px;color:#8a7560;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">No target set</div>';
         h+='<div style="display:flex;gap:14px;flex-wrap:wrap;">';
         untargeted.forEach(function(r){
-          h+='<div style="font-size:12px;color:#7a5c3a;"><strong>'+r[1]+r[3]+'</strong> '+r[0]+'</div>';
+          h+='<div style="font-size:12px;color:#5c3d2e;"><strong>'+r[1]+r[3]+'</strong> '+r[0]+'</div>';
         });
         h+='</div></div>';
       }
     } else {
       // No targets set — show the original simple macro grid + a prompt
-      h+='<div style="font-size:11px;color:#a08060;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;">Consumed today</div>';
+      h+='<div style="font-size:11px;color:#8a7560;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;">Consumed today</div>';
       h+='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px;">';
       [['Cal',sm.cal],['Protein',sm.protein+'g'],['Carbs',sm.carbs+'g'],['Fat',sm.fat+'g']].forEach(function(m){
-        h+='<div style="background:#f0e6d4;border-radius:8px;padding:10px 4px;text-align:center;">';
-        h+='<div style="font-size:16px;font-weight:700;color:#3d2b1a;">'+m[1]+'</div>';
-        h+='<div style="font-size:10px;color:#a08060;text-transform:uppercase;">'+m[0]+'</div></div>';
+        h+='<div style="background:#f5ecd9;border-radius:8px;padding:10px 4px;text-align:center;">';
+        h+='<div style="font-size:16px;font-weight:700;color:#5c3d2e;">'+m[1]+'</div>';
+        h+='<div style="font-size:10px;color:#8a7560;text-transform:uppercase;">'+m[0]+'</div></div>';
       });
       h+='</div>';
-      h+='<button onclick="setView(\'settings\')" style="background:transparent;border:1px dashed #c8b89a;color:#7a5c3a;border-radius:10px;padding:10px;width:100%;font-size:12px;cursor:pointer;">🎯 Set daily targets in Settings</button>';
+      h+='<button onclick="setView(\'settings\')" style="background:transparent;border:1px dashed #d9c9a8;color:#5c3d2e;border-radius:10px;padding:10px;width:100%;font-size:12px;cursor:pointer;">🎯 Set daily targets in Settings</button>';
     }
 
     h+='</div>';
@@ -1062,11 +1070,11 @@ function renderToday(){
   if(!todays.length){
     if(hasTargets()){
       // Gauges are shown above, just a small prompt
-      h+='<div style="text-align:center;padding:16px 20px;color:#a08060;font-size:13px;">No meals logged yet — log a meal or add a manual entry</div>';
+      h+='<div style="text-align:center;padding:16px 20px;color:#8a7560;font-size:13px;">No meals logged yet — log a meal or add a manual entry</div>';
     } else {
-      h+='<div style="text-align:center;padding:48px 20px;color:#a08060;">';
+      h+='<div style="text-align:center;padding:48px 20px;color:#8a7560;">';
       h+='<div style="font-size:40px;margin-bottom:12px;">🌱</div>';
-      h+='<div style="font-size:18px;font-weight:700;margin-bottom:6px;color:#7a5c3a;">Nothing logged yet</div>';
+      h+='<div style="font-size:18px;font-weight:700;margin-bottom:6px;color:#5c3d2e;">Nothing logged yet</div>';
       h+='<div style="font-size:13px;">Log a meal or add a manual entry</div></div>';
     }
     return h;
@@ -1074,8 +1082,8 @@ function renderToday(){
 
   // Section: Manual entries
   if(manualEntries.length){
-    h+='<div style="font-size:11px;font-weight:700;color:#7a5c3a;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px;">✏️ Manual ('+manualEntries.length+')</div>';
-    h+='<div style="background:#fff8f0;border-radius:12px;border:1px solid #e0d0ba;padding:0 14px;margin-bottom:16px;">';
+    h+='<div style="font-size:11px;font-weight:700;color:#5c3d2e;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px;">✏️ Manual ('+manualEntries.length+')</div>';
+    h+='<div style="background:#ffffff;border-radius:12px;border:1px solid #d9c9a8;padding:0 14px;margin-bottom:16px;">';
     manualEntries.forEach(function(x,i){
       var time=new Date(x.date).toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'});
       var parts=[];
@@ -1083,10 +1091,10 @@ function renderToday(){
       if(x.protein) parts.push(Math.round(x.protein)+'g pro');
       if(x.carbs) parts.push(Math.round(x.carbs)+'g carbs');
       if(x.fat) parts.push(Math.round(x.fat)+'g fat');
-      h+='<div onclick="openHistoryEdit(\''+x.hid+'\')" style="display:flex;align-items:center;gap:12px;padding:10px 0;cursor:pointer;'+(i<manualEntries.length-1?'border-bottom:1px solid #e8ddd0;':'')+'">';
-      h+='<div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:700;">'+esc(x.label||'Untitled')+(x.edited?' <span style="font-size:10px;color:#a08060;font-weight:400;">(edited)</span>':'')+'</div>';
-      h+='<div style="font-size:12px;color:#7a5c3a;">'+parts.join(' · ')+' · '+time+'</div></div>';
-      h+='<div style="font-size:13px;color:#a08060;">›</div>';
+      h+='<div onclick="openHistoryEdit(\''+x.hid+'\')" style="display:flex;align-items:center;gap:12px;padding:10px 0;cursor:pointer;'+(i<manualEntries.length-1?'border-bottom:1px solid #eadec5;':'')+'">';
+      h+='<div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:700;">'+esc(x.label||'Untitled')+(x.edited?' <span style="font-size:10px;color:#8a7560;font-weight:400;">(edited)</span>':'')+'</div>';
+      h+='<div style="font-size:12px;color:#5c3d2e;">'+parts.join(' · ')+' · '+time+'</div></div>';
+      h+='<div style="font-size:13px;color:#8a7560;">›</div>';
       h+='</div>';
     });
     h+='</div>';
@@ -1094,8 +1102,8 @@ function renderToday(){
 
   // Section: Meals eaten
   if(ate.length){
-    h+='<div style="font-size:11px;font-weight:700;color:#7a5c3a;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px;">🍽 Meals ('+ate.length+')</div>';
-    h+='<div style="background:#fff8f0;border-radius:12px;border:1px solid #e0d0ba;padding:0 14px;margin-bottom:16px;">';
+    h+='<div style="font-size:11px;font-weight:700;color:#5c3d2e;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px;">🍽 Meals ('+ate.length+')</div>';
+    h+='<div style="background:#ffffff;border-radius:12px;border:1px solid #d9c9a8;padding:0 14px;margin-bottom:16px;">';
     ate.forEach(function(x,i){
       var it=S.items.filter(function(z){return z.id===x.itemId;})[0];
       var u=x.unit||(it?unitOf(it):'portions');
@@ -1103,15 +1111,15 @@ function renderToday(){
       var m=it?macroFor(it,x.portions):null;
       var time=new Date(x.date).toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'});
       var tappable=!!x.hid;
-      var rowStyle='display:flex;align-items:center;gap:12px;padding:10px 0;'+(i<ate.length-1?'border-bottom:1px solid #e8ddd0;':'');
+      var rowStyle='display:flex;align-items:center;gap:12px;padding:10px 0;'+(i<ate.length-1?'border-bottom:1px solid #eadec5;':'');
       if(tappable){
         h+='<div onclick="openHistoryEdit(\''+x.hid+'\')" style="'+rowStyle+'cursor:pointer;">';
       } else {
         h+='<div style="'+rowStyle+'">';
       }
-      h+='<div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:700;">'+esc(x.itemName)+(x.edited?' <span style="font-size:10px;color:#a08060;font-weight:400;">(edited)</span>':'')+'</div>';
-      h+='<div style="font-size:12px;color:#7a5c3a;">'+x.portions+unitSuffix+(m?' · '+Math.round(m.cal)+' cal':'')+' · '+time+'</div></div>';
-      if(tappable) h+='<div style="font-size:13px;color:#a08060;">›</div>';
+      h+='<div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:700;">'+esc(x.itemName)+(x.edited?' <span style="font-size:10px;color:#8a7560;font-weight:400;">(edited)</span>':'')+'</div>';
+      h+='<div style="font-size:12px;color:#5c3d2e;">'+x.portions+unitSuffix+(m?' · '+Math.round(m.cal)+' cal':'')+' · '+time+'</div></div>';
+      if(tappable) h+='<div style="font-size:13px;color:#8a7560;">›</div>';
       h+='</div>';
     });
     h+='</div>';
@@ -1119,23 +1127,23 @@ function renderToday(){
 
   // Section: Wasted
   if(wasted.length){
-    h+='<div style="font-size:11px;font-weight:700;color:#7a5c3a;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px;">🗑 Wasted ('+wasted.length+')</div>';
-    h+='<div style="background:#fff8f0;border-radius:12px;border:1px solid #e0d0ba;padding:0 14px;margin-bottom:16px;">';
+    h+='<div style="font-size:11px;font-weight:700;color:#5c3d2e;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px;">🗑 Wasted ('+wasted.length+')</div>';
+    h+='<div style="background:#ffffff;border-radius:12px;border:1px solid #d9c9a8;padding:0 14px;margin-bottom:16px;">';
     wasted.forEach(function(x,i){
       var it=S.items.filter(function(z){return z.id===x.itemId;})[0];
       var u=x.unit||(it?unitOf(it):'portions');
       var unitSuffix=u==='portions'?' portion'+(x.portions>1?'s':''):u;
       var time=new Date(x.date).toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'});
       var tappable=!!x.hid;
-      var rowStyle='display:flex;align-items:center;gap:12px;padding:10px 0;'+(i<wasted.length-1?'border-bottom:1px solid #e8ddd0;':'');
+      var rowStyle='display:flex;align-items:center;gap:12px;padding:10px 0;'+(i<wasted.length-1?'border-bottom:1px solid #eadec5;':'');
       if(tappable){
         h+='<div onclick="openHistoryEdit(\''+x.hid+'\')" style="'+rowStyle+'cursor:pointer;">';
       } else {
         h+='<div style="'+rowStyle+'">';
       }
-      h+='<div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:700;">'+esc(x.itemName)+(x.edited?' <span style="font-size:10px;color:#a08060;font-weight:400;">(edited)</span>':'')+'</div>';
+      h+='<div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:700;">'+esc(x.itemName)+(x.edited?' <span style="font-size:10px;color:#8a7560;font-weight:400;">(edited)</span>':'')+'</div>';
       h+='<div style="font-size:12px;color:#b85c38;">'+x.portions+unitSuffix+' · '+time+'</div></div>';
-      if(tappable) h+='<div style="font-size:13px;color:#a08060;">›</div>';
+      if(tappable) h+='<div style="font-size:13px;color:#8a7560;">›</div>';
       h+='</div>';
     });
     h+='</div>';
@@ -1143,23 +1151,23 @@ function renderToday(){
 
   // Section: Prepped
   if(prepped.length){
-    h+='<div style="font-size:11px;font-weight:700;color:#7a5c3a;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px;">🥡 Prepped ('+prepped.length+')</div>';
-    h+='<div style="background:#fff8f0;border-radius:12px;border:1px solid #e0d0ba;padding:0 14px;margin-bottom:16px;">';
+    h+='<div style="font-size:11px;font-weight:700;color:#5c3d2e;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px;">🥡 Prepped ('+prepped.length+')</div>';
+    h+='<div style="background:#ffffff;border-radius:12px;border:1px solid #d9c9a8;padding:0 14px;margin-bottom:16px;">';
     prepped.forEach(function(x,i){
       var it=S.items.filter(function(z){return z.id===x.itemId;})[0];
       var u=x.unit||(it?unitOf(it):'portions');
       var unitSuffix=u==='portions'?' portion'+(x.portions>1?'s':''):u;
       var time=new Date(x.date).toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'});
       var tappable=!!x.hid;
-      var rowStyle='display:flex;align-items:center;gap:12px;padding:10px 0;'+(i<prepped.length-1?'border-bottom:1px solid #e8ddd0;':'');
+      var rowStyle='display:flex;align-items:center;gap:12px;padding:10px 0;'+(i<prepped.length-1?'border-bottom:1px solid #eadec5;':'');
       if(tappable){
         h+='<div onclick="openHistoryEdit(\''+x.hid+'\')" style="'+rowStyle+'cursor:pointer;">';
       } else {
         h+='<div style="'+rowStyle+'">';
       }
-      h+='<div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:700;">'+esc(x.itemName)+(x.edited?' <span style="font-size:10px;color:#a08060;font-weight:400;">(edited)</span>':'')+'</div>';
-      h+='<div style="font-size:12px;color:#7a9e7e;">'+x.portions+unitSuffix+' · '+time+'</div></div>';
-      if(tappable) h+='<div style="font-size:13px;color:#a08060;">›</div>';
+      h+='<div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:700;">'+esc(x.itemName)+(x.edited?' <span style="font-size:10px;color:#8a7560;font-weight:400;">(edited)</span>':'')+'</div>';
+      h+='<div style="font-size:12px;color:#6b7c5e;">'+x.portions+unitSuffix+' · '+time+'</div></div>';
+      if(tappable) h+='<div style="font-size:13px;color:#8a7560;">›</div>';
       h+='</div>';
     });
     h+='</div>';
@@ -1177,8 +1185,8 @@ function renderHistory(){
     grouped[d].push(h);
   });
   var days=Object.keys(grouped).sort(function(a,b){return b.localeCompare(a);});
-  var h='<div style="font-size:22px;font-weight:700;margin-bottom:18px;">Activity History</div>';
-  if(!S.history.length){ h+='<div style="text-align:center;padding:40px;color:#a08060;">No activity yet</div>'; return h; }
+  var h='<div class="pm-heading" style="font-size:28px;font-weight:600;margin-bottom:18px;letter-spacing:0.04em;">Activity History</div>';
+  if(!S.history.length){ h+='<div style="text-align:center;padding:40px;color:#8a7560;">No activity yet</div>'; return h; }
   days.forEach(function(day){
     var label=day===today?'Today':daysAgo(day+'T12:00:00')||day;
     var dc=0,dp=0,dany=false;
@@ -1195,10 +1203,10 @@ function renderHistory(){
       }
     });
     h+='<div style="display:flex;justify-content:space-between;align-items:baseline;margin:16px 0 4px;">';
-    h+='<div style="font-size:11px;font-weight:700;color:#7a5c3a;text-transform:uppercase;letter-spacing:0.8px;">'+label+'</div>';
-    if(dany) h+='<div style="font-size:11px;color:#a08060;">'+Math.round(dc)+' cal · '+Math.round(dp)+'g pro</div>';
+    h+='<div style="font-size:11px;font-weight:700;color:#5c3d2e;text-transform:uppercase;letter-spacing:0.8px;">'+label+'</div>';
+    if(dany) h+='<div style="font-size:11px;color:#8a7560;">'+Math.round(dc)+' cal · '+Math.round(dp)+'g pro</div>';
     h+='</div>';
-    h+='<div style="background:#fff8f0;border-radius:12px;border:1px solid #e0d0ba;padding:0 14px;margin-bottom:12px;">';
+    h+='<div style="background:#ffffff;border-radius:12px;border:1px solid #d9c9a8;padding:0 14px;margin-bottom:12px;">';
     grouped[day].forEach(function(x){
       var icon=x.type==='eat'?'🍽':x.type==='waste'?'🗑':x.type==='deleted'?'❌':x.type==='manual'?'✏️':'🥡';
       var name, meta;
@@ -1217,10 +1225,10 @@ function renderHistory(){
         name=x.itemName;
         meta=x.type==='eat'?'Ate '+x.portions+unitSuffix:x.type==='waste'?'Wasted '+x.portions+unitSuffix:x.type==='deleted'?'Removed from stock':'Prepped '+x.portions+unitSuffix;
       }
-      h+='<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid #e8ddd0;">';
+      h+='<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid #eadec5;">';
       h+='<div style="font-size:18px;width:26px;text-align:center;flex-shrink:0;">'+icon+'</div>';
       h+='<div style="flex:1;"><div style="font-size:14px;font-weight:700;">'+esc(name)+'</div>';
-      h+='<div style="font-size:12px;color:#7a5c3a;">'+meta+'</div></div></div>';
+      h+='<div style="font-size:12px;color:#5c3d2e;">'+meta+'</div></div></div>';
     });
     h+='</div>';
   });
@@ -1230,24 +1238,24 @@ function renderHistory(){
 // ── Settings view
 function renderSettings(){
   var s=S.settings;
-  var h='<div style="font-size:22px;font-weight:700;margin-bottom:18px;">Settings</div>';
+  var h='<div class="pm-heading" style="font-size:28px;font-weight:600;margin-bottom:18px;letter-spacing:0.04em;">Settings</div>';
 
   h+='<div style="margin-bottom:24px;">';
   h+='<div style="font-size:17px;font-weight:700;margin-bottom:2px;">Stock Alerts</div>';
-  h+='<div style="font-size:12px;color:#a08060;margin-bottom:12px;">Control when warnings appear</div>';
+  h+='<div style="font-size:12px;color:#8a7560;margin-bottom:12px;">Control when warnings appear</div>';
   h+=settingsRow('Low stock warning','Warn when portions at or below this','s-low',s.lowStockThreshold);
   h+=settingsRow('Default expiry (days)','Applied when no per-item expiry is set','s-exp',s.expiryDays);
   h+='</div>';
 
   h+='<div style="margin-bottom:24px;">';
   h+='<div style="font-size:17px;font-weight:700;margin-bottom:2px;">Forgotten Item Reminder</div>';
-  h+='<div style="font-size:12px;color:#a08060;margin-bottom:12px;">Alerts repeat daily until you eat the item</div>';
+  h+='<div style="font-size:12px;color:#8a7560;margin-bottom:12px;">Alerts repeat daily until you eat the item</div>';
   h+=settingsRow('First reminder after','Days since last eaten or prepped','s-fgt',s.forgottenDays);
   h+='</div>';
 
   h+='<div style="margin-bottom:24px;">';
   h+='<div style="font-size:17px;font-weight:700;margin-bottom:2px;">Daily Targets</div>';
-  h+='<div style="font-size:12px;color:#a08060;margin-bottom:12px;">Set to 0 to disable. Progress appears in the header and on the Today tab.</div>';
+  h+='<div style="font-size:12px;color:#8a7560;margin-bottom:12px;">Set to 0 to disable. Progress appears in the header and on the Today tab.</div>';
   h+=settingsTargetRow('Calories','s-tgt-cal',s.targetCal||'','e.g. 2500');
   h+=settingsTargetRow('Protein (g)','s-tgt-protein',s.targetProtein||'','e.g. 180');
   h+=settingsTargetRow('Carbs (g)','s-tgt-carbs',s.targetCarbs||'','e.g. 250');
@@ -1259,42 +1267,42 @@ function renderSettings(){
   // Categories management
   h+='<div style="margin-bottom:24px;">';
   h+='<div style="font-size:17px;font-weight:700;margin-bottom:2px;">Categories</div>';
-  h+='<div style="font-size:12px;color:#a08060;margin-bottom:12px;">Rename or reorder your categories. Changes apply to all items using them.</div>';
+  h+='<div style="font-size:12px;color:#8a7560;margin-bottom:12px;">Rename or reorder your categories. Changes apply to all items using them.</div>';
   var cats=S.settings.categories||DEFAULT_CATS;
   cats.forEach(function(c,idx){
-    h+='<div style="display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid #e8ddd0;">';
+    h+='<div style="display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid #eadec5;">';
     h+='<div style="flex:1;min-width:0;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(c)+'</div>';
-    h+='<button onclick="promptRenameCategory(\''+esc(c).replace(/\x27/g,'\\\x27')+'\')" style="background:transparent;border:1px solid #c8b89a;color:#7a5c3a;border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer;">Rename</button>';
-    h+='<button onclick="moveCategory(\''+esc(c).replace(/\x27/g,'\\\x27')+'\',-1)" '+(idx===0?'disabled':'')+' style="width:32px;height:32px;border-radius:8px;border:1px solid #c8b89a;background:transparent;font-size:14px;cursor:pointer;opacity:'+(idx===0?0.3:1)+';">▲</button>';
-    h+='<button onclick="moveCategory(\''+esc(c).replace(/\x27/g,'\\\x27')+'\',1)" '+(idx===cats.length-1?'disabled':'')+' style="width:32px;height:32px;border-radius:8px;border:1px solid #c8b89a;background:transparent;font-size:14px;cursor:pointer;opacity:'+(idx===cats.length-1?0.3:1)+';">▼</button>';
+    h+='<button onclick="promptRenameCategory(\''+esc(c).replace(/\x27/g,'\\\x27')+'\')" style="background:transparent;border:1px solid #d9c9a8;color:#5c3d2e;border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer;">Rename</button>';
+    h+='<button onclick="moveCategory(\''+esc(c).replace(/\x27/g,'\\\x27')+'\',-1)" '+(idx===0?'disabled':'')+' style="width:32px;height:32px;border-radius:8px;border:1px solid #d9c9a8;background:transparent;font-size:14px;cursor:pointer;opacity:'+(idx===0?0.3:1)+';">▲</button>';
+    h+='<button onclick="moveCategory(\''+esc(c).replace(/\x27/g,'\\\x27')+'\',1)" '+(idx===cats.length-1?'disabled':'')+' style="width:32px;height:32px;border-radius:8px;border:1px solid #d9c9a8;background:transparent;font-size:14px;cursor:pointer;opacity:'+(idx===cats.length-1?0.3:1)+';">▼</button>';
     h+='</div>';
   });
   h+='</div>';
 
   h+='<div style="margin-bottom:24px;">';
   h+='<div style="font-size:17px;font-weight:700;margin-bottom:2px;">Data Backup</div>';
-  h+='<div style="font-size:12px;color:#a08060;margin-bottom:12px;">Export your stock and history as JSON</div>';
-  h+='<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #e8ddd0;">';
-  h+='<div><div style="font-size:14px;">Export data</div><div style="font-size:12px;color:#a08060;">Download JSON backup</div></div>';
+  h+='<div style="font-size:12px;color:#8a7560;margin-bottom:12px;">Export your stock and history as JSON</div>';
+  h+='<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #eadec5;">';
+  h+='<div><div style="font-size:14px;">Export data</div><div style="font-size:12px;color:#8a7560;">Download JSON backup</div></div>';
   h+='<button onclick="exportData()" style="'+cs.btnSecondary+'padding:8px 14px;font-size:13px;">Export</button></div>';
   h+='<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;">';
-  h+='<div><div style="font-size:14px;">Import data</div><div style="font-size:12px;color:#a08060;">Restore from backup</div></div>';
+  h+='<div><div style="font-size:14px;">Import data</div><div style="font-size:12px;color:#8a7560;">Restore from backup</div></div>';
   h+='<label style="'+cs.btnSecondary+'padding:8px 14px;font-size:13px;cursor:pointer;">Import <input type="file" id="import-file" accept=".json" style="display:none;" onchange="handleImport(this)" /></label>';
   h+='</div></div>';
   return h;
 }
 
 function settingsRow(label,sub,id,val){
-  return '<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #e8ddd0;">'+
-    '<div><div style="font-size:14px;">'+label+'</div><div style="font-size:12px;color:#a08060;">'+sub+'</div></div>'+
-    '<input id="'+id+'" type="number" inputmode="decimal" value="'+val+'" min="1" style="width:64px;padding:7px 10px;border-radius:8px;border:1px solid #d4c4a8;background:#fff8f0;font-size:14px;color:#3d2b1a;text-align:center;-webkit-appearance:none;outline:none;" />'+
+  return '<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #eadec5;">'+
+    '<div><div style="font-size:14px;">'+label+'</div><div style="font-size:12px;color:#8a7560;">'+sub+'</div></div>'+
+    '<input id="'+id+'" type="number" inputmode="decimal" value="'+val+'" min="1" style="width:64px;padding:7px 10px;border-radius:8px;border:1px solid #d9c9a8;background:#ffffff;font-size:14px;color:#5c3d2e;text-align:center;-webkit-appearance:none;outline:none;" />'+
     '</div>';
 }
 
 function settingsTargetRow(label,id,val,placeholder){
-  return '<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #e8ddd0;">'+
+  return '<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #eadec5;">'+
     '<div style="font-size:14px;">'+label+'</div>'+
-    '<input id="'+id+'" type="number" inputmode="decimal" value="'+val+'" placeholder="'+placeholder+'" min="0" style="width:96px;padding:7px 10px;border-radius:8px;border:1px solid #d4c4a8;background:#fff8f0;font-size:14px;color:#3d2b1a;text-align:center;-webkit-appearance:none;outline:none;" />'+
+    '<input id="'+id+'" type="number" inputmode="decimal" value="'+val+'" placeholder="'+placeholder+'" min="0" style="width:96px;padding:7px 10px;border-radius:8px;border:1px solid #d9c9a8;background:#ffffff;font-size:14px;color:#5c3d2e;text-align:center;-webkit-appearance:none;outline:none;" />'+
     '</div>';
 }
 
@@ -1303,7 +1311,7 @@ function handleImport(input){ if(input.files[0])importData(input.files[0]); }
 // ── Modal
 function renderModal(){
   var m=S.modal, it=m.item||null;
-  var sheet='border-radius:20px 20px 0 0;padding:24px 24px calc(env(safe-area-inset-bottom) + 24px);width:100%;animation:slideUp 0.2s ease;background:#fff8f0;';
+  var sheet='border-radius:20px 20px 0 0;padding:24px 24px calc(env(safe-area-inset-bottom) + 24px);width:100%;animation:slideUp 0.2s ease;background:#ffffff;';
   var overlay='position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;display:flex;align-items:flex-end;animation:fadeIn 0.15s ease;';
   var h='<div style="'+overlay+'" onclick="if(event.target===this){S.modal=null;render();}">';
 
@@ -1314,7 +1322,7 @@ function renderModal(){
     var availTxt=it.portions+unitTxt+' '+(u==='portions'?'portion'+(it.portions!==1?'s':''):'')+' available';
     h+='<div style="'+sheet+'">';
     h+='<div style="font-size:18px;font-weight:700;margin-bottom:4px;">Log: '+esc(it.name)+'</div>';
-    h+='<div style="color:#7a5c3a;font-size:13px;margin-bottom:16px;">'+availTxt+'</div>';
+    h+='<div style="color:#5c3d2e;font-size:13px;margin-bottom:16px;">'+availTxt+'</div>';
     h+=stepperHTML('logPortions',n,unitStep(u),it.portions,u,it);
     h+='<div id="macro-preview" style="margin-top:14px;">'+macroPreviewHTML(it,n)+'</div>';
     h+='<div style="display:flex;gap:10px;margin-top:16px;">';
@@ -1327,7 +1335,7 @@ function renderModal(){
     var u=unitOf(it);
     h+='<div style="'+sheet+'">';
     h+='<div style="font-size:18px;font-weight:700;margin-bottom:4px;">Restock: '+esc(it.name)+'</div>';
-    h+='<div style="color:#7a5c3a;font-size:13px;margin-bottom:16px;">Currently '+it.portions+(u==='portions'?'':u)+' remaining</div>';
+    h+='<div style="color:#5c3d2e;font-size:13px;margin-bottom:16px;">Currently '+it.portions+(u==='portions'?'':u)+' remaining</div>';
     h+=stepperHTML('restockPortions',rn,unitStep(u),99999,u);
     h+='<div style="display:flex;gap:10px;margin-top:16px;">';
     h+='<button onclick="S.modal=null;render();" style="'+cs.btnSecondary+'flex:1;">Cancel</button>';
@@ -1339,7 +1347,7 @@ function renderModal(){
     var u=unitOf(it);
     h+='<div style="'+sheet+'">';
     h+='<div style="font-size:18px;font-weight:700;margin-bottom:4px;">Waste: '+esc(it.name)+'</div>';
-    h+='<div style="color:#7a5c3a;font-size:13px;margin-bottom:16px;">'+it.portions+(u==='portions'?'':u)+' in stock</div>';
+    h+='<div style="color:#5c3d2e;font-size:13px;margin-bottom:16px;">'+it.portions+(u==='portions'?'':u)+' in stock</div>';
     h+=stepperHTML('wastePortions',wn,unitStep(u),it.portions,u);
     h+='<div style="display:flex;gap:10px;margin-top:16px;">';
     h+='<button onclick="S.modal=null;render();" style="'+cs.btnSecondary+'flex:1;">Cancel</button>';
@@ -1349,7 +1357,7 @@ function renderModal(){
   } else if(m.type==='confirm-remove'){
     h+='<div style="'+sheet+'">';
     h+='<div style="font-size:18px;font-weight:700;margin-bottom:4px;">Remove item?</div>';
-    h+='<div style="color:#7a5c3a;font-size:13px;margin-bottom:20px;">&quot;'+esc(it.name)+'&quot; will be removed entirely. This can\'t be undone.</div>';
+    h+='<div style="color:#5c3d2e;font-size:13px;margin-bottom:20px;">&quot;'+esc(it.name)+'&quot; will be removed entirely. This can\'t be undone.</div>';
     h+='<div style="display:flex;gap:10px;">';
     h+='<button onclick="S.modal=null;render();" style="'+cs.btnSecondary+'flex:1;">Cancel</button>';
     h+='<button onclick="removeItem(\''+it.id+'\');" style="background:#b85c38;color:#fff;border:none;border-radius:10px;padding:12px 16px;font-size:13px;font-weight:700;cursor:pointer;flex:1;">Remove</button>';
@@ -1360,7 +1368,7 @@ function renderModal(){
     var lpu=unitOf(it);
     h+='<div style="'+sheet+'">';
     h+='<div style="font-size:18px;font-weight:700;margin-bottom:4px;">Log some as eaten?</div>';
-    h+='<div style="color:#7a5c3a;font-size:13px;margin-bottom:16px;">Sampled some of &quot;'+esc(it.name)+'&quot; while prepping? Log it today.</div>';
+    h+='<div style="color:#5c3d2e;font-size:13px;margin-bottom:16px;">Sampled some of &quot;'+esc(it.name)+'&quot; while prepping? Log it today.</div>';
     h+=stepperHTML('logPortions',lpn,unitStep(lpu),it.portions,lpu,it);
     h+='<div id="macro-preview" style="margin-top:14px;">'+macroPreviewHTML(it,lpn)+'</div>';
     h+='<div style="display:flex;gap:10px;margin-top:16px;">';
@@ -1377,7 +1385,7 @@ function renderModal(){
     var confirmLabel=isArch?'Unarchive':'Archive';
     h+='<div style="'+sheet+'">';
     h+='<div style="font-size:18px;font-weight:700;margin-bottom:4px;">'+title+'</div>';
-    h+='<div style="color:#7a5c3a;font-size:13px;margin-bottom:20px;">'+body+'</div>';
+    h+='<div style="color:#5c3d2e;font-size:13px;margin-bottom:20px;">'+body+'</div>';
     h+='<div style="display:flex;gap:10px;">';
     h+='<button onclick="S.modal=null;render();" style="'+cs.btnSecondary+'flex:1;">Cancel</button>';
     h+='<button onclick="confirmArchive(\''+it.id+'\');" style="'+cs.btnPrimary+'flex:1;">'+confirmLabel+'</button>';
@@ -1392,11 +1400,11 @@ function renderModal(){
     var titleIcon=entry.type==='eat'?'🍽':entry.type==='waste'?'🗑':'🥡';
     h+='<div style="'+sheet+'">';
     h+='<div style="font-size:18px;font-weight:700;margin-bottom:4px;">'+titleIcon+' Edit: '+esc(entry.itemName)+'</div>';
-    h+='<div style="color:#7a5c3a;font-size:13px;margin-bottom:16px;">Amount '+typeLabel+' — adjusts stock to match</div>';
+    h+='<div style="color:#5c3d2e;font-size:13px;margin-bottom:16px;">Amount '+typeLabel+' — adjusts stock to match</div>';
     h+='<label style="'+cs.label+'">Amount</label>';
     h+='<div style="display:flex;align-items:baseline;gap:8px;">';
     h+='<input id="hist-amt" type="number" inputmode="decimal" value="'+entry.portions+'" min="0.1" step="'+(hU==='portions'?'1':'10')+'" oninput="S.histEditAmount=this.value" style="'+cs.input+'flex:1;font-size:20px;font-weight:700;" />';
-    if(hUSfx) h+='<span style="font-size:16px;font-weight:700;color:#7a5c3a;">'+hUSfx+'</span>';
+    if(hUSfx) h+='<span style="font-size:16px;font-weight:700;color:#5c3d2e;">'+hUSfx+'</span>';
     h+='</div>';
     h+='<div style="display:flex;gap:10px;margin-top:20px;">';
     h+='<button onclick="S.modal=null;render();" style="'+cs.btnSecondary+'flex:1;">Cancel</button>';
@@ -1410,10 +1418,10 @@ function renderModal(){
     var isEdit=!!m.editingHid;
     h+='<div style="'+sheet+'max-height:85vh;overflow-y:auto;">';
     h+='<div style="font-size:18px;font-weight:700;margin-bottom:4px;">✏️ '+(isEdit?'Edit manual entry':'Add manual entry')+'</div>';
-    h+='<div style="color:#7a5c3a;font-size:13px;margin-bottom:16px;">For meals not tracked in your prep stock — breakfast, sides, drinks, etc.</div>';
+    h+='<div style="color:#5c3d2e;font-size:13px;margin-bottom:16px;">For meals not tracked in your prep stock — breakfast, sides, drinks, etc.</div>';
     h+='<label style="'+cs.label+'">Label</label>';
     h+='<input id="mf-label" style="'+cs.input+'" value="'+esc(mf.label)+'" placeholder="e.g. Breakfast, Protein shake" oninput="S.manualForm.label=this.value" />';
-    h+='<div style="font-size:14px;font-weight:700;margin:16px 0 2px;color:#5a3e2a;">Macros <span style="font-size:12px;color:#a08060;font-weight:400;">(at least one required)</span></div>';
+    h+='<div style="font-size:14px;font-weight:700;margin:16px 0 2px;color:#5c3d2e;">Macros <span style="font-size:12px;color:#8a7560;font-weight:400;">(at least one required)</span></div>';
     h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">';
     [['mf-cal','Calories','cal',mf.cal],['mf-protein','Protein (g)','protein',mf.protein],['mf-carbs','Carbs (g)','carbs',mf.carbs],['mf-fat','Fat (g)','fat',mf.fat]].forEach(function(x){
       h+='<div><label style="'+cs.label+'">'+x[1]+'</label><input id="'+x[0]+'" type="number" inputmode="decimal" style="'+cs.input+'" value="'+esc(x[3])+'" placeholder="0" min="0" oninput="S.manualForm.'+x[2]+'=this.value" /></div>';
@@ -1446,7 +1454,7 @@ function renderModal(){
     h+='</select></div>';
     h+='</div>';
     h+='<label style="'+cs.label+'">Expires after (days)</label><input id="e-expiry" type="number" inputmode="decimal" style="'+cs.input+'" value="'+esc(f.expiryDays)+'" placeholder="e.g. 5" min="1" />';
-    h+='<div style="font-size:14px;font-weight:700;margin:16px 0 2px;color:#5a3e2a;">'+macroLbl+'</div>';
+    h+='<div style="font-size:14px;font-weight:700;margin:16px 0 2px;color:#5c3d2e;">'+macroLbl+'</div>';
     h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">';
     [['e-cal','Calories',f.cal],['e-protein','Protein (g)',f.protein],['e-carbs','Carbs (g)',f.carbs],['e-fat','Fat (g)',f.fat]].forEach(function(m){
       h+='<div><label style="'+cs.label+'">'+m[1]+'</label><input id="'+m[0]+'" type="number" inputmode="decimal" style="'+cs.input+'" value="'+esc(m[2])+'" placeholder="0" /></div>';
@@ -1458,16 +1466,16 @@ function renderModal(){
     h+='<button onclick="collectAndSaveEdit();" style="'+cs.btnPrimary+'flex:1;">Save Changes</button>';
     h+='</div>';
     // Duplicate (handy for Creami bases and similar recipes with near-identical macros)
-    h+='<button onclick="duplicateItem(\''+it.id+'\');" style="background:transparent;border:1px dashed #c8b89a;color:#7a5c3a;border-radius:10px;padding:12px;width:100%;font-size:13px;cursor:pointer;margin-top:16px;text-align:left;">';
+    h+='<button onclick="duplicateItem(\''+it.id+'\');" style="background:transparent;border:1px dashed #d9c9a8;color:#5c3d2e;border-radius:10px;padding:12px;width:100%;font-size:13px;cursor:pointer;margin-top:16px;text-align:left;">';
     h+='<div style="font-weight:700;margin-bottom:2px;">📋 Duplicate item</div>';
-    h+='<div style="font-size:11px;color:#a08060;">Opens a prep session pre-filled with this item\'s details</div>';
+    h+='<div style="font-size:11px;color:#8a7560;">Opens a prep session pre-filled with this item\'s details</div>';
     h+='</button>';
     // Archive / Unarchive (infrequent action, tucked under save button)
     var archLabel=isArchived(it)?'📤 Unarchive item':'📁 Archive item';
     var archSub=isArchived(it)?'Restore to your active stock':'Hide from stock and alerts (can be restored later)';
-    h+='<button onclick="collectEditForm();openArchiveConfirm(\''+it.id+'\');" style="background:transparent;border:1px dashed #c8b89a;color:#7a5c3a;border-radius:10px;padding:12px;width:100%;font-size:13px;cursor:pointer;margin-top:10px;text-align:left;">';
+    h+='<button onclick="collectEditForm();openArchiveConfirm(\''+it.id+'\');" style="background:transparent;border:1px dashed #d9c9a8;color:#5c3d2e;border-radius:10px;padding:12px;width:100%;font-size:13px;cursor:pointer;margin-top:10px;text-align:left;">';
     h+='<div style="font-weight:700;margin-bottom:2px;">'+archLabel+'</div>';
-    h+='<div style="font-size:11px;color:#a08060;">'+archSub+'</div>';
+    h+='<div style="font-size:11px;color:#8a7560;">'+archSub+'</div>';
     h+='</button>';
     h+='</div>';
   }
@@ -1479,19 +1487,19 @@ function renderModal(){
 function macroPreviewHTML(it,n){
   var m=macroFor(it,n);
   if(!m)return '';
-  return '<div style="background:#f0e6d4;border-radius:8px;padding:10px 14px;font-size:13px;color:#5a3e2a;">~'+Math.round(m.cal)+' cal · '+Math.round(m.protein)+'g protein · '+Math.round(m.carbs)+'g carbs · '+Math.round(m.fat)+'g fat</div>';
+  return '<div style="background:#f5ecd9;border-radius:8px;padding:10px 14px;font-size:13px;color:#5c3d2e;">~'+Math.round(m.cal)+' cal · '+Math.round(m.protein)+'g protein · '+Math.round(m.carbs)+'g carbs · '+Math.round(m.fat)+'g fat</div>';
 }
 
 function stepperHTML(field,val,step,max,unit,item){
   var suffix=unit&&unit!=='portions'?unit:'';
   var itemRef=item?',\''+item.id+'\'':'';
   return '<div style="display:flex;align-items:center;gap:16px;justify-content:center;">'+
-    '<button onclick="stepperNudge(\''+field+'\','+(-step)+','+step+','+max+itemRef+')" style="width:44px;height:44px;border-radius:10px;border:1px solid #c8b89a;background:transparent;font-size:22px;cursor:pointer;flex-shrink:0;">&minus;</button>'+
+    '<button onclick="stepperNudge(\''+field+'\','+(-step)+','+step+','+max+itemRef+')" style="width:44px;height:44px;border-radius:10px;border:1px solid #d9c9a8;background:transparent;font-size:22px;cursor:pointer;flex-shrink:0;">&minus;</button>'+
     '<div style="display:flex;align-items:baseline;">'+
-      '<input type="number" inputmode="decimal" value="'+val+'" min="1" max="'+max+'" onfocus="this.select()" oninput="onStepperInput(\''+field+'\',this.value,'+max+itemRef+')" style="font-size:28px;font-weight:700;width:80px;text-align:center;border:none;background:transparent;color:#3d2b1a;-webkit-appearance:none;outline:none;padding:0;font-family:inherit;" />'+
-      (suffix?'<span style="font-size:18px;font-weight:700;color:#7a5c3a;margin-left:2px;">'+suffix+'</span>':'')+
+      '<input type="number" inputmode="decimal" value="'+val+'" min="1" max="'+max+'" onfocus="this.select()" oninput="onStepperInput(\''+field+'\',this.value,'+max+itemRef+')" style="font-size:28px;font-weight:700;width:80px;text-align:center;border:none;background:transparent;color:#5c3d2e;-webkit-appearance:none;outline:none;padding:0;font-family:inherit;" />'+
+      (suffix?'<span style="font-size:18px;font-weight:700;color:#5c3d2e;margin-left:2px;">'+suffix+'</span>':'')+
     '</div>'+
-    '<button onclick="stepperNudge(\''+field+'\','+step+','+step+','+max+itemRef+')" style="width:44px;height:44px;border-radius:10px;border:1px solid #c8b89a;background:transparent;font-size:22px;cursor:pointer;flex-shrink:0;">+</button>'+
+    '<button onclick="stepperNudge(\''+field+'\','+step+','+step+','+max+itemRef+')" style="width:44px;height:44px;border-radius:10px;border:1px solid #d9c9a8;background:transparent;font-size:22px;cursor:pointer;flex-shrink:0;">+</button>'+
     '</div>';
 }
 
