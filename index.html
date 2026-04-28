@@ -782,7 +782,7 @@ function render(){
       ['carbs',m.carbs,S.settings.targetCarbs,ringColors.carbs],
       ['fat',m.fat,S.settings.targetFat,ringColors.fat]
     ];
-    header+='<button onclick="setView(\'today\')" style="background:rgba(255,255,255,0.1);border:none;border-radius:20px;padding:4px 8px;display:flex;gap:4px;align-items:center;cursor:pointer;">';
+    header+='<button onclick="setView(\'day\');S.selectedDate=todayStr();render();" style="background:rgba(255,255,255,0.1);border:none;border-radius:20px;padding:4px 8px;display:flex;gap:4px;align-items:center;cursor:pointer;">';
     tgts.forEach(function(t){
       var pct=t[2]>0?t[1]/t[2]:0;
       header+='<div style="position:relative;width:24px;height:24px;display:flex;align-items:center;justify-content:center;">';
@@ -832,7 +832,8 @@ function render(){
 
   // Nav
   header+='<div style="display:flex;gap:4px;padding:8px 0 10px;align-items:stretch;">';
-  var navItems=[['stock','Stock'],['add','+ Prep'],['log','Log'],['today','Today'],['history','History']];
+  // Day view used to be split into Today and History — merged into a single date-aware view
+  var navItems=[['stock','Stock'],['add','+ Prep'],['day','Day']];
   navItems.forEach(function(v){
     var active=S.view===v[0];
     header+='<button onclick="setView(\''+v[0]+'\')" style="flex:1;padding:8px 4px;border-radius:8px;border:none;font-size:12px;cursor:pointer;background:'+(active?'#c8922a':'rgba(255,255,255,0.08)')+';color:'+(active?'#5c3d2e':'#d9c9a8')+';font-weight:'+(active?'700':'400')+';">'+v[1]+'</button>';
@@ -846,10 +847,13 @@ function render(){
   var main='<div style="flex:1;overflow-y:auto;padding:16px 16px '+safeBot+';-webkit-overflow-scrolling:touch;">';
   if(S.view==='stock') main+=renderStock();
   else if(S.view==='add') main+=renderAdd();
-  else if(S.view==='log') main+=renderLog();
-  else if(S.view==='today') main+=renderToday();
-  else if(S.view==='history') main+=renderHistory();
+  else if(S.view==='day') main+=renderDay();
   else if(S.view==='settings') main+=renderSettings();
+  // Legacy fallbacks (in case any code path still tries to setView('log'/'today'/'history'))
+  else if(S.view==='log'){ S.view='stock'; main+=renderStock(); }
+  else if(S.view==='today'){ S.view='day'; S.selectedDate=todayStr(); main+=renderDay(); }
+  else if(S.view==='history'){ S.view='day'; main+=renderDay(); }
+  else main+=renderStock();
   main+='</div>';
 
   // ── Modal
@@ -933,6 +937,11 @@ function renderStock(){
     h+='</div>';
   }
 
+  // Quick action: + Add manual entry (visible in normal stock view only)
+  if(!S.showArchived && S.stockFilter==='all' && !S.reorderMode){
+    h+='<button onclick="openManualEntry()" style="background:transparent;border:1px dashed #d9c9a8;color:#5c3d2e;border-radius:10px;padding:10px;width:100%;font-size:13px;cursor:pointer;margin-bottom:12px;">+ Add manual entry</button>';
+  }
+
   // Category filter pills (only shown when not viewing archived and no stock filter)
   if(!S.showArchived && S.stockFilter==='all' && !S.reorderMode){
     h+='<div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:14px;">';
@@ -993,8 +1002,13 @@ function renderCard(it){
 
   var h='<div style="background:#ffffff;border-radius:14px;border:1.5px solid '+borderColor+';overflow:hidden;margin-bottom:10px;">';
 
-  // Header row (tappable)
-  h+='<div onclick="toggleExpand(\''+it.id+'\')" style="padding:14px 16px;cursor:pointer;">';
+  // Header row — tap to log (or expand if archived/out-of-stock); chevron always toggles expand
+  // Stocked items: tap = log modal. Out of stock or archived: tap = expand (no log path makes sense).
+  var primaryAction=isArchived(it)||oos
+    ? 'toggleExpand(\''+it.id+'\')'
+    : 'openLogModal(\''+it.id+'\')';
+  h+='<div style="display:flex;align-items:stretch;">';
+  h+='<div onclick="'+primaryAction+'" style="flex:1;padding:14px 14px 14px 16px;cursor:pointer;min-width:0;">';
   h+='<div style="display:flex;justify-content:space-between;align-items:flex-start;">';
   h+='<div style="flex:1;min-width:0;">';
   h+='<div style="font-weight:700;font-size:16px;">'+esc(it.name)+'</div>';
@@ -1016,7 +1030,10 @@ function renderCard(it){
   // Progress bar
   h+='<div style="background:#eadec5;border-radius:4px;height:5px;margin-top:10px;">';
   h+='<div style="width:'+Math.max(2,pct*100)+'%;height:100%;border-radius:4px;background:'+barColor(pct)+';"></div></div>';
-  h+='</div>'; // end header
+  h+='</div>'; // end primary tap area
+  // Chevron column — separate tap target to expand for full actions
+  h+='<button onclick="toggleExpand(\''+it.id+'\')" aria-label="More actions" style="width:36px;flex-shrink:0;background:transparent;border:none;border-left:1px solid #f5ecd9;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#8a7560;font-size:14px;">'+(exp?'▲':'▼')+'</button>';
+  h+='</div>'; // end header row
 
   if(exp){
     h+='<div style="padding:0 16px 14px;border-top:1px solid #f5ecd9;">';
@@ -1170,316 +1187,34 @@ function collectAndAdd(){
   addItem();
 }
 
-// ── Log view
-function renderLog(){
-  var avail=S.items.filter(function(it){return it.portions>0 && !isArchived(it);});
-  // Apply category filter (reuse S.filterCat, shared with Stock view)
-  var filtered=S.filterCat==='All'?avail:avail.filter(function(it){return it.category===S.filterCat;});
-  // Sort by most stock first — raw portions primary, ratio as tiebreaker.
-  // Caveat: comparing portions across units (e.g. 500g vs 8 portions) isn't
-  // perfectly meaningful, but within the same unit it gives the expected order.
-  filtered.sort(function(a,b){
-    if(b.portions!==a.portions) return b.portions-a.portions;
-    var ra=a.totalPortions>0?a.portions/a.totalPortions:0;
-    var rb=b.totalPortions>0?b.portions/b.totalPortions:0;
-    return rb-ra;
-  });
-  var h='<div class="pm-heading" style="font-size:28px;font-weight:600;margin-bottom:6px;letter-spacing:0.04em;">Food Log</div>';
-  h+='<div style="color:#5c3d2e;font-size:13px;margin-bottom:16px;">Tap an item to deduct from stock or log a manual entry</div>';
 
-  // Manual entry button (above category pills)
-  h+='<button onclick="openManualEntry()" style="background:transparent;border:1px dashed #d9c9a8;color:#5c3d2e;border-radius:10px;padding:12px;width:100%;font-size:13px;cursor:pointer;margin-bottom:14px;">+ Add manual entry</button>';
-
-  // Category filter pills
-  if(avail.length){
-    h+='<div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:14px;">';
-    CATS.forEach(function(c){
-      var active=S.filterCat===c;
-      var count=c==='All'?avail.length:avail.filter(function(it){return it.category===c;}).length;
-      if(c!=='All' && count===0) return; // Hide empty categories in Log view to reduce clutter
-      var badgeBg=active?'rgba(240,217,181,0.25)':'#f5ecd9';
-      var badgeColor=active?'#faf6ef':'#5c3d2e';
-      var badge=count>0?'<span style="background:'+badgeBg+';border-radius:10px;padding:1px 7px;margin-left:6px;font-size:11px;font-weight:700;color:'+badgeColor+';">'+count+'</span>':'';
-      h+='<button onclick="S.filterCat=\''+c+'\';render();" style="padding:5px 12px;border-radius:20px;white-space:nowrap;font-size:12px;border:'+(active?'none':'1px solid #eadec5')+';background:'+(active?'#5c3d2e':'transparent')+';color:'+(active?'#faf6ef':'#5c3d2e')+';display:inline-flex;align-items:center;">'+c+badge+'</button>';
-    });
-    h+='</div>';
-  }
-
-  if(!avail.length){
-    h+='<div style="text-align:center;padding:48px 20px;color:#8a7560;"><div style="font-size:40px;margin-bottom:12px;">😅</div>';
-    h+='<div style="font-size:18px;font-weight:700;margin-bottom:6px;color:#5c3d2e;">No stock available</div>';
-    h+='<div style="font-size:13px;">Time to prep!</div></div>';
-    return h;
-  }
-
-  if(!filtered.length){
-    h+='<div style="text-align:center;padding:32px 20px;color:#8a7560;">';
-    h+='<div style="font-size:14px;">Nothing in '+esc(S.filterCat)+' available.</div>';
-    h+='<button onclick="S.filterCat=\'All\';render();" style="margin-top:12px;background:transparent;border:1px solid #d9c9a8;color:#5c3d2e;border-radius:8px;padding:6px 14px;font-size:13px;cursor:pointer;">Show all</button>';
-    h+='</div>';
-    return h;
-  }
-
-  filtered.forEach(function(it){
-    var fgt=daysSince(it.lastEaten||it.prepDate)>=S.settings.forgottenDays;
-    var u=unitOf(it);
-    var macrosMeta='';
-    if(it.macros&&it.macros.cal){
-      macrosMeta=' · '+it.macros.cal+' cal, '+it.macros.protein+'g pro '+(u==='portions'?'per portion':'per 100'+u);
-    }
-    h+='<button onclick="openLogModal(\''+it.id+'\')" style="background:#ffffff;border:1px solid '+(fgt?'#9080c0':'#d9c9a8')+';border-radius:12px;padding:14px 16px;width:100%;text-align:left;cursor:pointer;display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">';
-    h+='<div><div style="font-weight:700;font-size:15px;color:#5c3d2e;">'+esc(it.name)+(fgt?' 💤':'')+'</div>';
-    h+='<div style="font-size:12px;color:#5c3d2e;margin-top:2px;">'+esc(it.category)+macrosMeta+'</div></div>';
-    h+='<div style="background:#5c3d2e;color:#faf6ef;border-radius:20px;padding:4px 14px;font-size:14px;font-weight:700;flex-shrink:0;">'+it.portions+(u==='portions'?'':u)+'</div>';
-    h+='</button>';
-  });
-  return h;
-}
-
-// ── Today view
-function renderToday(){
-  var t=todayStr();
-  var todays=S.history.filter(function(x){return x.date&&x.date.indexOf(t)===0;});
-  var macros=todayMacros();
-  var h='<div class="pm-heading" style="font-size:28px;font-weight:600;margin-bottom:6px;letter-spacing:0.04em;">Today</div>';
-  h+='<div style="color:#5c3d2e;font-size:13px;margin-bottom:16px;">'+new Date().toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'})+'</div>';
-
-  // Macro summary / gauges card
-  var sm=macros||{cal:0,protein:0,carbs:0,fat:0};
-  var showCard=macros||hasTargets();
-  if(showCard){
-    var ringColors={cal:'#4a6fa5',protein:'#a84f2e',carbs:'#c8922a',fat:'#6b7c5e'};
-    h+='<div style="background:#ffffff;border:1px solid #d9c9a8;border-radius:14px;padding:16px;margin-bottom:20px;">';
-
-    if(hasTargets()){
-      // Detailed gauges when targets are set
-      h+='<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:14px;">';
-      h+='<div style="font-size:11px;color:#8a7560;text-transform:uppercase;letter-spacing:0.5px;">Daily targets</div>';
-      h+='<button onclick="setView(\'settings\')" style="background:none;border:none;font-size:11px;color:#8a7560;cursor:pointer;padding:0;">Adjust ›</button>';
-      h+='</div>';
-
-      var macroRows=[
-        ['Calories',sm.cal,S.settings.targetCal,'',ringColors.cal],
-        ['Protein',sm.protein,S.settings.targetProtein,'g',ringColors.protein],
-        ['Carbs',sm.carbs,S.settings.targetCarbs,'g',ringColors.carbs],
-        ['Fat',sm.fat,S.settings.targetFat,'g',ringColors.fat]
-      ];
-      macroRows.forEach(function(row,i){
-        var label=row[0],val=row[1],tgt=row[2],sfx=row[3],col=row[4];
-        if(tgt<=0) return; // skip macros without a target set
-        var remaining=tgt-val;
-        var pct=val/tgt;
-        var rightLabel, rightColor;
-        if(remaining>=0){
-          rightLabel=remaining+sfx+' left';
-          rightColor='#5c3d2e';
-        } else {
-          rightLabel=Math.abs(remaining)+sfx+' over';
-          rightColor='#b85c38';
-        }
-        h+='<div style="margin-bottom:'+(i<macroRows.length-1?'14px':'0')+';">';
-        h+='<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;">';
-        h+='<div style="font-size:13px;font-weight:700;color:#5c3d2e;">'+label+'</div>';
-        h+='<div style="font-size:13px;color:'+rightColor+';"><strong>'+val+sfx+'</strong> <span style="color:#8a7560;"> / '+tgt+sfx+'</span></div>';
-        h+='</div>';
-        h+=progressBar(pct,col);
-        h+='<div style="text-align:right;font-size:11px;color:'+rightColor+';margin-top:3px;">'+rightLabel+'</div>';
-        h+='</div>';
-      });
-      // For any macros without a target set, show them as a simple row
-      var untargeted=macroRows.filter(function(r){return r[2]<=0;});
-      if(untargeted.length && macros){
-        h+='<div style="border-top:1px solid #f5ecd9;margin-top:12px;padding-top:12px;">';
-        h+='<div style="font-size:10px;color:#8a7560;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">No target set</div>';
-        h+='<div style="display:flex;gap:14px;flex-wrap:wrap;">';
-        untargeted.forEach(function(r){
-          h+='<div style="font-size:12px;color:#5c3d2e;"><strong>'+r[1]+r[3]+'</strong> '+r[0]+'</div>';
-        });
-        h+='</div></div>';
-      }
-    } else {
-      // No targets set — show the original simple macro grid + a prompt
-      h+='<div style="font-size:11px;color:#8a7560;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;">Consumed today</div>';
-      h+='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px;">';
-      [['Cal',sm.cal],['Protein',sm.protein+'g'],['Carbs',sm.carbs+'g'],['Fat',sm.fat+'g']].forEach(function(m){
-        h+='<div style="background:#f5ecd9;border-radius:8px;padding:10px 4px;text-align:center;">';
-        h+='<div style="font-size:16px;font-weight:700;color:#5c3d2e;">'+m[1]+'</div>';
-        h+='<div style="font-size:10px;color:#8a7560;text-transform:uppercase;">'+m[0]+'</div></div>';
-      });
-      h+='</div>';
-      h+='<button onclick="setView(\'settings\')" style="background:transparent;border:1px dashed #d9c9a8;color:#5c3d2e;border-radius:10px;padding:10px;width:100%;font-size:12px;cursor:pointer;">🎯 Set daily targets in Settings</button>';
-    }
-
-    h+='</div>';
-  }
-
-  // Split activity by type
-  var ate=todays.filter(function(x){return x.type==='eat';});
-  var wasted=todays.filter(function(x){return x.type==='waste';});
-  var prepped=todays.filter(function(x){return x.type==='prep';});
-  var manualEntries=todays.filter(function(x){return x.type==='manual';});
-  var plannedToday=todays.filter(function(x){return x.type==='planned';});
-
-  // Treat planned-only days as "something to do" rather than empty
-  if(!todays.length){
-    if(hasTargets()){
-      h+='<div style="text-align:center;padding:16px 20px;color:#8a7560;font-size:13px;">No meals logged yet — log a meal or add a manual entry</div>';
-    } else {
-      h+='<div style="text-align:center;padding:48px 20px;color:#8a7560;">';
-      h+='<div style="font-size:40px;margin-bottom:12px;">🌱</div>';
-      h+='<div style="font-size:18px;font-weight:700;margin-bottom:6px;color:#5c3d2e;">Nothing logged yet</div>';
-      h+='<div style="font-size:13px;">Log a meal or add a manual entry</div></div>';
-    }
-    return h;
-  }
-
-  // Section: Planned for today (planned eat entries that haven't been confirmed yet)
-  if(plannedToday.length){
-    h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">';
-    h+='<div style="font-size:11px;font-weight:700;color:#5c3d2e;text-transform:uppercase;letter-spacing:0.8px;">📅 Planned ('+plannedToday.length+')</div>';
-    h+='<button onclick="confirmAllPlannedToday()" style="background:#5c3d2e;color:#faf6ef;border:none;border-radius:8px;padding:5px 11px;font-size:11px;font-weight:700;cursor:pointer;">Confirm all</button>';
-    h+='</div>';
-    h+='<div style="background:#fffbf4;border-radius:12px;border:1px dashed #c8922a;padding:0 14px;margin-bottom:16px;">';
-    plannedToday.forEach(function(x,i){
-      var isManualPlan=x.plannedKind==='manual';
-      var rowName, rowDetail;
-      if(isManualPlan){
-        rowName=x.label||'Untitled';
-        var parts=[];
-        if(x.cal) parts.push(Math.round(x.cal)+' cal');
-        if(x.protein) parts.push(Math.round(x.protein)+'g pro');
-        if(x.carbs) parts.push(Math.round(x.carbs)+'g carbs');
-        if(x.fat) parts.push(Math.round(x.fat)+'g fat');
-        rowDetail='Manual plan'+(parts.length?' · '+parts.join(' · '):'');
-      } else {
-        rowName=x.itemName;
-        var it=S.items.filter(function(z){return z.id===x.itemId;})[0];
-        var u=x.unit||(it?unitOf(it):'portions');
-        var unitSuffix=u==='portions'?(' portion'+(x.portions>1?'s':'')):u;
-        var stockNote='';
-        if(!it){
-          stockNote=' · <span style="color:#a84f2e;">item removed</span>';
-        } else if(it.portions<=0){
-          stockNote=' · <span style="color:#a84f2e;">no stock</span>';
-        } else if(it.portions<x.portions){
-          stockNote=' · <span style="color:#c8922a;">only '+it.portions+(u==='portions'?'':u)+' available</span>';
-        }
-        rowDetail=x.portions+unitSuffix+stockNote;
-      }
-      h+='<div style="display:flex;align-items:center;gap:10px;padding:10px 0;'+(i<plannedToday.length-1?'border-bottom:1px solid #eadec5;':'')+'">';
-      h+='<div style="flex:1;min-width:0;">';
-      h+='<div style="font-size:14px;font-weight:700;">'+esc(rowName)+'</div>';
-      h+='<div style="font-size:12px;color:#8a7560;">'+rowDetail+'</div>';
-      h+='</div>';
-      h+='<button onclick="confirmPlannedEntryUI(\''+x.hid+'\')" style="background:#5c3d2e;color:#faf6ef;border:none;border-radius:8px;padding:6px 10px;font-size:11px;cursor:pointer;flex-shrink:0;">Confirm</button>';
-      h+='<button onclick="cancelPlannedEntry(\''+x.hid+'\')" style="background:transparent;border:1px solid #d9c9a8;color:#8a7560;border-radius:8px;padding:5px 9px;font-size:11px;cursor:pointer;flex-shrink:0;">Cancel</button>';
-      h+='</div>';
-    });
-    h+='</div>';
-  }
-
-  // Section: Manual entries
-  if(manualEntries.length){
-    h+='<div style="font-size:11px;font-weight:700;color:#5c3d2e;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px;">✏️ Manual ('+manualEntries.length+')</div>';
-    h+='<div style="background:#ffffff;border-radius:12px;border:1px solid #d9c9a8;padding:0 14px;margin-bottom:16px;">';
-    manualEntries.forEach(function(x,i){
-      var time=new Date(x.date).toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'});
-      var parts=[];
-      if(x.cal) parts.push(Math.round(x.cal)+' cal');
-      if(x.protein) parts.push(Math.round(x.protein)+'g pro');
-      if(x.carbs) parts.push(Math.round(x.carbs)+'g carbs');
-      if(x.fat) parts.push(Math.round(x.fat)+'g fat');
-      h+='<div onclick="openHistoryEdit(\''+x.hid+'\')" style="display:flex;align-items:center;gap:12px;padding:10px 0;cursor:pointer;'+(i<manualEntries.length-1?'border-bottom:1px solid #eadec5;':'')+'">';
-      h+='<div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:700;">'+esc(x.label||'Untitled')+(x.edited?' <span style="font-size:10px;color:#8a7560;font-weight:400;">(edited)</span>':'')+'</div>';
-      h+='<div style="font-size:12px;color:#5c3d2e;">'+parts.join(' · ')+' · '+time+'</div></div>';
-      h+='<div style="font-size:13px;color:#8a7560;">›</div>';
-      h+='</div>';
-    });
-    h+='</div>';
-  }
-
-  // Section: Meals eaten
-  if(ate.length){
-    h+='<div style="font-size:11px;font-weight:700;color:#5c3d2e;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px;">🍽 Meals ('+ate.length+')</div>';
-    h+='<div style="background:#ffffff;border-radius:12px;border:1px solid #d9c9a8;padding:0 14px;margin-bottom:16px;">';
-    ate.forEach(function(x,i){
-      var it=S.items.filter(function(z){return z.id===x.itemId;})[0];
-      var u=x.unit||(it?unitOf(it):'portions');
-      var unitSuffix=u==='portions'?' portion'+(x.portions>1?'s':''):u;
-      var m=it?macroFor(it,x.portions):null;
-      var time=new Date(x.date).toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'});
-      var tappable=!!x.hid;
-      var rowStyle='display:flex;align-items:center;gap:12px;padding:10px 0;'+(i<ate.length-1?'border-bottom:1px solid #eadec5;':'');
-      if(tappable){
-        h+='<div onclick="openHistoryEdit(\''+x.hid+'\')" style="'+rowStyle+'cursor:pointer;">';
-      } else {
-        h+='<div style="'+rowStyle+'">';
-      }
-      h+='<div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:700;">'+esc(x.itemName)+(x.edited?' <span style="font-size:10px;color:#8a7560;font-weight:400;">(edited)</span>':'')+'</div>';
-      h+='<div style="font-size:12px;color:#5c3d2e;">'+x.portions+unitSuffix+(m?' · '+Math.round(m.cal)+' cal':'')+' · '+time+'</div></div>';
-      if(tappable) h+='<div style="font-size:13px;color:#8a7560;">›</div>';
-      h+='</div>';
-    });
-    h+='</div>';
-  }
-
-  // Section: Wasted
-  if(wasted.length){
-    h+='<div style="font-size:11px;font-weight:700;color:#5c3d2e;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px;">🗑 Wasted ('+wasted.length+')</div>';
-    h+='<div style="background:#ffffff;border-radius:12px;border:1px solid #d9c9a8;padding:0 14px;margin-bottom:16px;">';
-    wasted.forEach(function(x,i){
-      var it=S.items.filter(function(z){return z.id===x.itemId;})[0];
-      var u=x.unit||(it?unitOf(it):'portions');
-      var unitSuffix=u==='portions'?' portion'+(x.portions>1?'s':''):u;
-      var time=new Date(x.date).toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'});
-      var tappable=!!x.hid;
-      var rowStyle='display:flex;align-items:center;gap:12px;padding:10px 0;'+(i<wasted.length-1?'border-bottom:1px solid #eadec5;':'');
-      if(tappable){
-        h+='<div onclick="openHistoryEdit(\''+x.hid+'\')" style="'+rowStyle+'cursor:pointer;">';
-      } else {
-        h+='<div style="'+rowStyle+'">';
-      }
-      h+='<div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:700;">'+esc(x.itemName)+(x.edited?' <span style="font-size:10px;color:#8a7560;font-weight:400;">(edited)</span>':'')+'</div>';
-      h+='<div style="font-size:12px;color:#b85c38;">'+x.portions+unitSuffix+' · '+time+'</div></div>';
-      if(tappable) h+='<div style="font-size:13px;color:#8a7560;">›</div>';
-      h+='</div>';
-    });
-    h+='</div>';
-  }
-
-  // Section: Prepped
-  if(prepped.length){
-    h+='<div style="font-size:11px;font-weight:700;color:#5c3d2e;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px;">🥡 Prepped ('+prepped.length+')</div>';
-    h+='<div style="background:#ffffff;border-radius:12px;border:1px solid #d9c9a8;padding:0 14px;margin-bottom:16px;">';
-    prepped.forEach(function(x,i){
-      var it=S.items.filter(function(z){return z.id===x.itemId;})[0];
-      var u=x.unit||(it?unitOf(it):'portions');
-      var unitSuffix=u==='portions'?' portion'+(x.portions>1?'s':''):u;
-      var time=new Date(x.date).toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'});
-      var tappable=!!x.hid;
-      var rowStyle='display:flex;align-items:center;gap:12px;padding:10px 0;'+(i<prepped.length-1?'border-bottom:1px solid #eadec5;':'');
-      if(tappable){
-        h+='<div onclick="openHistoryEdit(\''+x.hid+'\')" style="'+rowStyle+'cursor:pointer;">';
-      } else {
-        h+='<div style="'+rowStyle+'">';
-      }
-      h+='<div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:700;">'+esc(x.itemName)+(x.edited?' <span style="font-size:10px;color:#8a7560;font-weight:400;">(edited)</span>':'')+'</div>';
-      h+='<div style="font-size:12px;color:#6b7c5e;">'+x.portions+unitSuffix+' · '+time+'</div></div>';
-      if(tappable) h+='<div style="font-size:13px;color:#8a7560;">›</div>';
-      h+='</div>';
-    });
-    h+='</div>';
-  }
-
-  return h;
-}
-
-// ── History view
-function renderHistory(){
+// ── Day view (merged Today + History)
+// Drives off S.selectedDate. When selectedDate is today, behaves as the old
+// Today tab (gauges, planned with Confirm, manual section editable, eaten section
+// editable). When selectedDate is past or future, behaves as the old History
+// tab (day macro summary or projected, planned with Cancel only, copy controls).
+function renderDay(){
   if(!S.selectedDate) S.selectedDate=todayStr();
   var sel=S.selectedDate;
   var t=todayStr();
   var isToday=sel===t;
+  var isFuture=sel>t;
+  var isPast=sel<t;
+
+  var dayEntries=S.history.filter(function(x){return x.date && x.date.indexOf(sel)===0;});
+  // Sort earliest first within the day
+  dayEntries.sort(function(a,b){return (a.date||'').localeCompare(b.date||'');});
+
+  var ate=dayEntries.filter(function(x){return x.type==='eat';});
+  var manualEntries=dayEntries.filter(function(x){return x.type==='manual';});
+  var wasted=dayEntries.filter(function(x){return x.type==='waste';});
+  var prepped=dayEntries.filter(function(x){return x.type==='prep';});
+  var deleted=dayEntries.filter(function(x){return x.type==='deleted';});
+  var plannedEntries=dayEntries.filter(function(x){return x.type==='planned';});
+  var eaten=ate.concat(manualEntries);
+  // Re-sort eaten chronologically since concat broke order
+  eaten.sort(function(a,b){return (a.date||'').localeCompare(b.date||'');});
+  var copyableCount=eaten.filter(function(x){return !!x.hid;}).length;
 
   // Find earliest history date for "no further back" detection
   var earliestDate=null;
@@ -1489,22 +1224,10 @@ function renderHistory(){
     if(!earliestDate || d<earliestDate) earliestDate=d;
   });
   var canGoBack=!earliestDate || sel>earliestDate;
-  // Forward navigation now allowed past today (for planning ahead)
-  var canGoForward=true;
 
-  // Entries for selected day
-  var dayEntries=S.history.filter(function(x){return x.date && x.date.indexOf(sel)===0;});
-  // Sort EARLIEST first within the day (chronological top-to-bottom)
-  dayEntries.sort(function(a,b){return (a.date||'').localeCompare(b.date||'');});
-
-  // Split into "eaten" (eat + manual), "planned" (future plans), and "other" (waste + prep + deleted)
-  var eaten=dayEntries.filter(function(x){return x.type==='eat'||x.type==='manual';});
-  var plannedEntries=dayEntries.filter(function(x){return x.type==='planned';});
-  var other=dayEntries.filter(function(x){return x.type==='waste'||x.type==='prep'||x.type==='deleted';});
-  var copyableCount=eaten.filter(function(x){return !!x.hid;}).length;
-
+  // Header row: title + multi-copy button
   var h='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">';
-  h+='<div class="pm-heading" style="font-size:28px;font-weight:600;letter-spacing:0.04em;">History</div>';
+  h+='<div class="pm-heading" style="font-size:28px;font-weight:600;letter-spacing:0.04em;">Day</div>';
   if(!S.historySelectMode && copyableCount>0){
     h+='<button onclick="toggleSelectMode()" style="background:transparent;border:1px solid #d9c9a8;color:#5c3d2e;border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;">Multi-copy</button>';
   } else if(S.historySelectMode){
@@ -1512,18 +1235,87 @@ function renderHistory(){
   }
   h+='</div>';
 
-  // Date navigation (centre cell opens calendar)
+  // Date navigation card
   h+='<div style="display:flex;align-items:center;justify-content:space-between;background:#ffffff;border:1px solid #d9c9a8;border-radius:12px;padding:6px;margin-bottom:14px;">';
   h+='<button onclick="S.selectedDate=shiftDate(S.selectedDate,-1);S.historySelectMode=false;S.selectedHids={};render();" '+(!canGoBack?'disabled':'')+' style="width:36px;height:36px;border-radius:8px;border:none;background:transparent;font-size:16px;cursor:pointer;color:#5c3d2e;opacity:'+(canGoBack?1:0.3)+';">◀</button>';
   h+='<button onclick="openCalendar(\'navigate\')" style="text-align:center;flex:1;cursor:pointer;background:transparent;border:none;padding:4px 8px;">';
   h+='<div class="pm-heading" style="font-size:17px;font-weight:600;color:#5c3d2e;letter-spacing:0.02em;">'+esc(fmtDateLabel(sel))+'</div>';
-  h+='<div style="font-size:11px;color:#8a7560;">tap for calendar</div>';
+  if(!isToday) h+='<div style="font-size:11px;color:#8a7560;">tap for calendar</div>';
+  else h+='<div style="font-size:11px;color:#8a7560;">'+new Date().toLocaleDateString(undefined,{weekday:'long',month:'short',day:'numeric'})+'</div>';
   h+='</button>';
   h+='<button onclick="S.selectedDate=shiftDate(S.selectedDate,1);S.historySelectMode=false;S.selectedHids={};render();" style="width:36px;height:36px;border-radius:8px;border:none;background:transparent;font-size:16px;cursor:pointer;color:#5c3d2e;">▶</button>';
   h+='</div>';
 
-  // Day macro summary
-  if(eaten.length){
+  // Quick "+ Add manual entry" button (only on today)
+  if(isToday){
+    h+='<button onclick="openManualEntry()" style="background:transparent;border:1px dashed #d9c9a8;color:#5c3d2e;border-radius:10px;padding:10px;width:100%;font-size:13px;cursor:pointer;margin-bottom:14px;">+ Add manual entry</button>';
+  }
+
+  // Macro summary / gauges card
+  // Today: detailed gauges (matches old Today tab). Other days: simple summary or projected.
+  if(isToday){
+    var macros=todayMacros();
+    var sm=macros||{cal:0,protein:0,carbs:0,fat:0};
+    var showCard=macros||hasTargets();
+    if(showCard){
+      var ringColors={cal:'#4a6fa5',protein:'#a84f2e',carbs:'#c8922a',fat:'#6b7c5e'};
+      h+='<div style="background:#ffffff;border:1px solid #d9c9a8;border-radius:14px;padding:16px;margin-bottom:20px;">';
+
+      if(hasTargets()){
+        h+='<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:14px;">';
+        h+='<div style="font-size:11px;color:#8a7560;text-transform:uppercase;letter-spacing:0.5px;">Daily targets</div>';
+        h+='<button onclick="setView(\'settings\')" style="background:none;border:none;font-size:11px;color:#8a7560;cursor:pointer;padding:0;">Adjust ›</button>';
+        h+='</div>';
+
+        var macroRows=[
+          ['Calories',sm.cal,S.settings.targetCal,'',ringColors.cal],
+          ['Protein',sm.protein,S.settings.targetProtein,'g',ringColors.protein],
+          ['Carbs',sm.carbs,S.settings.targetCarbs,'g',ringColors.carbs],
+          ['Fat',sm.fat,S.settings.targetFat,'g',ringColors.fat]
+        ];
+        macroRows.forEach(function(row,i){
+          var label=row[0],val=row[1],tgt=row[2],sfx=row[3],col=row[4];
+          if(tgt<=0) return;
+          var remaining=tgt-val;
+          var pct=val/tgt;
+          var rightLabel, rightColor;
+          if(remaining>=0){ rightLabel=remaining+sfx+' left'; rightColor='#5c3d2e'; }
+          else { rightLabel=Math.abs(remaining)+sfx+' over'; rightColor='#b85c38'; }
+          h+='<div style="margin-bottom:'+(i<macroRows.length-1?'14px':'0')+';">';
+          h+='<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;">';
+          h+='<div style="font-size:13px;font-weight:700;color:#5c3d2e;">'+label+'</div>';
+          h+='<div style="font-size:13px;color:'+rightColor+';"><strong>'+val+sfx+'</strong> <span style="color:#8a7560;"> / '+tgt+sfx+'</span></div>';
+          h+='</div>';
+          h+=progressBar(pct,col);
+          h+='<div style="text-align:right;font-size:11px;color:'+rightColor+';margin-top:3px;">'+rightLabel+'</div>';
+          h+='</div>';
+        });
+        var untargeted=macroRows.filter(function(r){return r[2]<=0;});
+        if(untargeted.length && macros){
+          h+='<div style="border-top:1px solid #f5ecd9;margin-top:12px;padding-top:12px;">';
+          h+='<div style="font-size:10px;color:#8a7560;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">No target set</div>';
+          h+='<div style="display:flex;gap:14px;flex-wrap:wrap;">';
+          untargeted.forEach(function(r){
+            h+='<div style="font-size:12px;color:#5c3d2e;"><strong>'+r[1]+r[3]+'</strong> '+r[0]+'</div>';
+          });
+          h+='</div></div>';
+        }
+      } else {
+        h+='<div style="font-size:11px;color:#8a7560;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;">Consumed today</div>';
+        h+='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px;">';
+        [['Cal',sm.cal],['Protein',sm.protein+'g'],['Carbs',sm.carbs+'g'],['Fat',sm.fat+'g']].forEach(function(m){
+          h+='<div style="background:#f5ecd9;border-radius:8px;padding:10px 4px;text-align:center;">';
+          h+='<div style="font-size:16px;font-weight:700;color:#5c3d2e;">'+m[1]+'</div>';
+          h+='<div style="font-size:10px;color:#8a7560;text-transform:uppercase;">'+m[0]+'</div></div>';
+        });
+        h+='</div>';
+        h+='<button onclick="setView(\'settings\')" style="background:transparent;border:1px dashed #d9c9a8;color:#5c3d2e;border-radius:10px;padding:10px;width:100%;font-size:12px;cursor:pointer;">🎯 Set daily targets in Settings</button>';
+      }
+
+      h+='</div>';
+    }
+  } else if(eaten.length){
+    // Past/future day with logged entries — simple summary
     var dc=0,dp=0,dcb=0,df=0,dany=false;
     eaten.forEach(function(x){
       if(x.type==='eat'){
@@ -1547,7 +1339,7 @@ function renderHistory(){
       h+='</div>';
     }
   } else if(plannedEntries.length){
-    // No actual entries yet, but there are plans — show projected macros
+    // Projected from plans (typically future days)
     var pc=0,pp=0,pcb=0,pf=0,pany=false;
     plannedEntries.forEach(function(x){
       if(x.plannedKind==='manual'){
@@ -1588,81 +1380,34 @@ function renderHistory(){
 
   // Empty state
   if(!dayEntries.length){
-    h+='<div style="text-align:center;padding:40px 20px;color:#8a7560;">';
+    var emptyMsg;
+    if(isToday){
+      if(hasTargets()){
+        emptyMsg='No meals logged yet — log a meal or add a manual entry';
+      } else {
+        h+='<div style="text-align:center;padding:48px 20px;color:#8a7560;">';
+        h+='<div style="font-size:40px;margin-bottom:12px;">🌱</div>';
+        h+='<div style="font-size:18px;font-weight:700;margin-bottom:6px;color:#5c3d2e;">Nothing logged yet</div>';
+        h+='<div style="font-size:13px;">Log a meal or add a manual entry</div></div>';
+        return h;
+      }
+    } else {
+      emptyMsg='No activity '+(isFuture?'planned for this day':'on this day');
+    }
+    h+='<div style="text-align:center;padding:32px 20px;color:#8a7560;">';
     h+='<div style="font-size:32px;margin-bottom:8px;">📋</div>';
-    h+='<div style="font-size:14px;">No activity '+(isToday?'today':(sel>t?'planned for this day':'on this day'))+'</div>';
+    h+='<div style="font-size:14px;">'+emptyMsg+'</div>';
     h+='</div>';
     return h;
   }
 
-  // Render an entry row (used for both eaten and other sections)
-  function renderRow(x, i, total, allowCopy){
-    var icon=x.type==='eat'?'🍽':x.type==='waste'?'🗑':x.type==='deleted'?'❌':x.type==='manual'?'✏️':x.type==='planned'?'📅':'🥡';
-    var name, meta;
-    if(x.type==='manual'){
-      name=x.label||'Untitled';
-      var parts=[];
-      if(x.cal) parts.push(Math.round(x.cal)+' cal');
-      if(x.protein) parts.push(Math.round(x.protein)+'g pro');
-      if(x.carbs) parts.push(Math.round(x.carbs)+'g carbs');
-      if(x.fat) parts.push(Math.round(x.fat)+'g fat');
-      meta='Manual entry'+(parts.length?' · '+parts.join(' · '):'');
-    } else {
-      var it=S.items.filter(function(z){return z.id===x.itemId;})[0];
-      var u=x.unit||(it?unitOf(it):'portions');
-      var unitSuffix=u==='portions'?' portion'+(x.portions>1?'s':''):u;
-      name=x.itemName;
-      meta=x.type==='eat'?'Ate '+x.portions+unitSuffix
-        :x.type==='waste'?'Wasted '+x.portions+unitSuffix
-        :x.type==='deleted'?'Removed from stock'
-        :x.type==='planned'?'Planned · '+x.portions+unitSuffix
-        :'Prepped '+x.portions+unitSuffix;
-    }
-    var copyable=allowCopy && (x.type==='eat'||x.type==='manual') && !!x.hid;
-    var rowBorder=i<total-1?'border-bottom:1px solid #eadec5;':'';
-    var rowHtml='';
-    if(S.historySelectMode && copyable){
-      var isSelected=!!S.selectedHids[x.hid];
-      rowHtml+='<div onclick="toggleSelectedHid(\''+x.hid+'\')" style="display:flex;align-items:center;gap:12px;padding:10px 0;cursor:pointer;'+rowBorder+'">';
-      rowHtml+='<div style="width:22px;height:22px;border-radius:6px;border:2px solid '+(isSelected?'#5c3d2e':'#d9c9a8')+';background:'+(isSelected?'#5c3d2e':'transparent')+';display:flex;align-items:center;justify-content:center;flex-shrink:0;">';
-      if(isSelected) rowHtml+='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#faf6ef" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
-      rowHtml+='</div>';
-      rowHtml+='<div style="font-size:18px;width:26px;text-align:center;flex-shrink:0;">'+icon+'</div>';
-      rowHtml+='<div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:700;">'+esc(name)+'</div>';
-      rowHtml+='<div style="font-size:12px;color:#8a7560;">'+meta+'</div></div>';
-      rowHtml+='</div>';
-    } else {
-      rowHtml+='<div style="display:flex;align-items:center;gap:12px;padding:10px 0;'+rowBorder+'">';
-      rowHtml+='<div style="font-size:18px;width:26px;text-align:center;flex-shrink:0;">'+icon+'</div>';
-      rowHtml+='<div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:700;">'+esc(name)+'</div>';
-      rowHtml+='<div style="font-size:12px;color:#8a7560;">'+meta+'</div></div>';
-      if(copyable && !S.historySelectMode){
-        if(isToday){
-          // From today, single-row copy must let the user pick a destination day
-          rowHtml+='<button onclick="event.stopPropagation();confirmCopySingle(\''+x.hid+'\')" style="background:transparent;border:1px solid #d9c9a8;color:#5c3d2e;border-radius:8px;padding:5px 10px;font-size:11px;cursor:pointer;flex-shrink:0;">Copy</button>';
-        } else {
-          // From a past day, single-row copy goes straight to today (fast path)
-          rowHtml+='<button onclick="event.stopPropagation();copyEntriesToTodaySingle(\''+x.hid+'\')" style="background:transparent;border:1px solid #d9c9a8;color:#5c3d2e;border-radius:8px;padding:5px 10px;font-size:11px;cursor:pointer;flex-shrink:0;">Copy</button>';
-        }
-      }
-      rowHtml+='</div>';
-    }
-    return rowHtml;
-  }
-
-  // Eaten section (chronological top-down)
-  if(eaten.length){
-    h+='<div style="background:#ffffff;border-radius:12px;border:1px solid #d9c9a8;padding:0 14px;margin-bottom:14px;">';
-    eaten.forEach(function(x,i){ h+=renderRow(x,i,eaten.length,true); });
-    h+='</div>';
-  }
-
-  // Planned section (with stock awareness for future days)
+  // Section: Planned (with Confirm only on today, Cancel always)
   if(plannedEntries.length){
-    var sel2=sel;
-    var isPastOrToday=sel2<=t;
-    h+='<div style="font-size:11px;font-weight:700;color:#5c3d2e;text-transform:uppercase;letter-spacing:0.8px;margin:18px 0 6px;">📅 Planned ('+plannedEntries.length+')</div>';
-    h+='<div style="background:#fffbf4;border-radius:12px;border:1px dashed #c8922a;padding:0 14px;margin-bottom:14px;">';
+    h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">';
+    h+='<div style="font-size:11px;font-weight:700;color:#5c3d2e;text-transform:uppercase;letter-spacing:0.8px;">📅 Planned ('+plannedEntries.length+')</div>';
+    if(isToday) h+='<button onclick="confirmAllPlannedToday()" style="background:#5c3d2e;color:#faf6ef;border:none;border-radius:8px;padding:5px 11px;font-size:11px;font-weight:700;cursor:pointer;">Confirm all</button>';
+    h+='</div>';
+    h+='<div style="background:#fffbf4;border-radius:12px;border:1px dashed #c8922a;padding:0 14px;margin-bottom:16px;">';
     plannedEntries.forEach(function(x,i){
       var isManualPlan=x.plannedKind==='manual';
       var rowName, rowDetail;
@@ -1680,300 +1425,117 @@ function renderHistory(){
         var u=x.unit||(it?unitOf(it):'portions');
         var unitSuffix=u==='portions'?(' portion'+(x.portions>1?'s':'')):u;
         var stockNote='';
-        if(!it){
-          stockNote=' · <span style="color:#a84f2e;">item removed</span>';
-        } else if(it.portions<=0){
-          stockNote=' · <span style="color:#a84f2e;">no stock</span>';
-        } else if(it.portions<x.portions){
-          stockNote=' · <span style="color:#c8922a;">only '+it.portions+(u==='portions'?'':u)+' available</span>';
-        }
+        if(!it) stockNote=' · <span style="color:#a84f2e;">item removed</span>';
+        else if(it.portions<=0) stockNote=' · <span style="color:#a84f2e;">no stock</span>';
+        else if(it.portions<x.portions) stockNote=' · <span style="color:#c8922a;">only '+it.portions+(u==='portions'?'':u)+' available</span>';
         rowDetail=x.portions+unitSuffix+stockNote;
       }
       h+='<div style="display:flex;align-items:center;gap:10px;padding:10px 0;'+(i<plannedEntries.length-1?'border-bottom:1px solid #eadec5;':'')+'">';
-      h+='<div style="font-size:18px;width:26px;text-align:center;flex-shrink:0;">📅</div>';
-      h+='<div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:700;">'+esc(rowName)+'</div>';
-      h+='<div style="font-size:12px;color:#8a7560;">'+rowDetail+'</div></div>';
-      // Cancel button always available for plans
+      if(!isToday) h+='<div style="font-size:18px;width:26px;text-align:center;flex-shrink:0;">📅</div>';
+      h+='<div style="flex:1;min-width:0;">';
+      h+='<div style="font-size:14px;font-weight:700;">'+esc(rowName)+'</div>';
+      h+='<div style="font-size:12px;color:#8a7560;">'+rowDetail+'</div>';
+      h+='</div>';
+      if(isToday){
+        h+='<button onclick="confirmPlannedEntryUI(\''+x.hid+'\')" style="background:#5c3d2e;color:#faf6ef;border:none;border-radius:8px;padding:6px 10px;font-size:11px;cursor:pointer;flex-shrink:0;">Confirm</button>';
+      }
       h+='<button onclick="cancelPlannedEntry(\''+x.hid+'\')" style="background:transparent;border:1px solid #d9c9a8;color:#8a7560;border-radius:8px;padding:5px 9px;font-size:11px;cursor:pointer;flex-shrink:0;">Cancel</button>';
       h+='</div>';
     });
     h+='</div>';
   }
 
-  // Other activity section (waste / prep / deleted)
+  // Section: Eaten (eat + manual, chronological). Each row tappable to edit.
+  // Per-row Copy button shows on past/today (today rows route via confirm flow).
+  if(eaten.length){
+    h+='<div style="font-size:11px;font-weight:700;color:#5c3d2e;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px;">🍽 Eaten ('+eaten.length+')</div>';
+    h+='<div style="background:#ffffff;border-radius:12px;border:1px solid #d9c9a8;padding:0 14px;margin-bottom:14px;">';
+    eaten.forEach(function(x,i){
+      var time=x.date?new Date(x.date).toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'}):'';
+      var rowName, rowDetail;
+      if(x.type==='manual'){
+        rowName=x.label||'Untitled';
+        var parts=[];
+        if(x.cal) parts.push(Math.round(x.cal)+' cal');
+        if(x.protein) parts.push(Math.round(x.protein)+'g pro');
+        if(x.carbs) parts.push(Math.round(x.carbs)+'g carbs');
+        if(x.fat) parts.push(Math.round(x.fat)+'g fat');
+        rowDetail=parts.join(' · ')+(parts.length?' · ':'')+time;
+      } else {
+        var it=S.items.filter(function(z){return z.id===x.itemId;})[0];
+        var u=x.unit||(it?unitOf(it):'portions');
+        var unitSuffix=u==='portions'?' portion'+(x.portions>1?'s':''):u;
+        var m=it?macroFor(it,x.portions):null;
+        rowName=x.itemName;
+        rowDetail=x.portions+unitSuffix+(m?' · '+Math.round(m.cal)+' cal':'')+' · '+time;
+      }
+      var tappable=!!x.hid;
+      var copyable=tappable && S.historySelectMode;
+      var rowBorder=i<eaten.length-1?'border-bottom:1px solid #eadec5;':'';
+
+      if(S.historySelectMode && tappable){
+        var isSelected=!!S.selectedHids[x.hid];
+        h+='<div onclick="toggleSelectedHid(\''+x.hid+'\')" style="display:flex;align-items:center;gap:12px;padding:10px 0;cursor:pointer;'+rowBorder+'">';
+        h+='<div style="width:22px;height:22px;border-radius:6px;border:2px solid '+(isSelected?'#5c3d2e':'#d9c9a8')+';background:'+(isSelected?'#5c3d2e':'transparent')+';display:flex;align-items:center;justify-content:center;flex-shrink:0;">';
+        if(isSelected) h+='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#faf6ef" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+        h+='</div>';
+        h+='<div style="font-size:18px;width:26px;text-align:center;flex-shrink:0;">'+(x.type==='manual'?'✏️':'🍽')+'</div>';
+        h+='<div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:700;">'+esc(rowName)+'</div>';
+        h+='<div style="font-size:12px;color:#8a7560;">'+rowDetail+'</div></div>';
+        h+='</div>';
+      } else {
+        if(tappable) h+='<div onclick="openHistoryEdit(\''+x.hid+'\')" style="display:flex;align-items:center;gap:12px;padding:10px 0;cursor:pointer;'+rowBorder+'">';
+        else h+='<div style="display:flex;align-items:center;gap:12px;padding:10px 0;'+rowBorder+'">';
+        h+='<div style="font-size:18px;width:26px;text-align:center;flex-shrink:0;">'+(x.type==='manual'?'✏️':'🍽')+'</div>';
+        h+='<div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:700;">'+esc(rowName)+(x.edited?' <span style="font-size:10px;color:#8a7560;font-weight:400;">(edited)</span>':'')+'</div>';
+        h+='<div style="font-size:12px;color:#5c3d2e;">'+rowDetail+'</div></div>';
+        // Per-row copy button (when not in select mode)
+        if(tappable && !S.historySelectMode){
+          if(isToday){
+            h+='<button onclick="event.stopPropagation();confirmCopySingle(\''+x.hid+'\')" style="background:transparent;border:1px solid #d9c9a8;color:#5c3d2e;border-radius:8px;padding:5px 10px;font-size:11px;cursor:pointer;flex-shrink:0;">Copy</button>';
+          } else {
+            h+='<button onclick="event.stopPropagation();copyEntriesToTodaySingle(\''+x.hid+'\')" style="background:transparent;border:1px solid #d9c9a8;color:#5c3d2e;border-radius:8px;padding:5px 10px;font-size:11px;cursor:pointer;flex-shrink:0;">Copy</button>';
+          }
+        }
+        if(tappable) h+='<div style="font-size:13px;color:#8a7560;margin-left:6px;">›</div>';
+        h+='</div>';
+      }
+    });
+    h+='</div>';
+  }
+
+  // Section: Other activity (waste / prep / deleted)
+  var other=wasted.concat(prepped).concat(deleted);
+  other.sort(function(a,b){return (a.date||'').localeCompare(b.date||'');});
   if(other.length){
     h+='<div style="font-size:11px;font-weight:700;color:#8a7560;text-transform:uppercase;letter-spacing:0.8px;margin:18px 0 6px;">Other activity</div>';
     h+='<div style="background:#ffffff;border-radius:12px;border:1px solid #d9c9a8;padding:0 14px;margin-bottom:12px;opacity:0.92;">';
-    other.forEach(function(x,i){ h+=renderRow(x,i,other.length,false); });
+    other.forEach(function(x,i){
+      var icon=x.type==='waste'?'🗑':x.type==='prep'?'🥡':'❌';
+      var time=x.date?new Date(x.date).toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'}):'';
+      var u=x.unit||'portions';
+      var unitSuffix=u==='portions'?' portion'+(x.portions>1?'s':''):u;
+      var meta=x.type==='waste'?'Wasted '+x.portions+unitSuffix
+        :x.type==='prep'?'Prepped '+x.portions+unitSuffix
+        :'Removed from stock';
+      var color=x.type==='waste'?'#b85c38':x.type==='prep'?'#6b7c5e':'#8a7560';
+      var tappable=!!x.hid && (x.type==='waste'||x.type==='prep');
+      var rowBorder=i<other.length-1?'border-bottom:1px solid #eadec5;':'';
+      if(tappable){
+        h+='<div onclick="openHistoryEdit(\''+x.hid+'\')" style="display:flex;align-items:center;gap:12px;padding:10px 0;cursor:pointer;'+rowBorder+'">';
+      } else {
+        h+='<div style="display:flex;align-items:center;gap:12px;padding:10px 0;'+rowBorder+'">';
+      }
+      h+='<div style="font-size:18px;width:26px;text-align:center;flex-shrink:0;">'+icon+'</div>';
+      h+='<div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:700;">'+esc(x.itemName)+(x.edited?' <span style="font-size:10px;color:#8a7560;font-weight:400;">(edited)</span>':'')+'</div>';
+      h+='<div style="font-size:12px;color:'+color+';">'+meta+(time?' · '+time:'')+'</div></div>';
+      if(tappable) h+='<div style="font-size:13px;color:#8a7560;">›</div>';
+      h+='</div>';
+    });
     h+='</div>';
   }
 
   return h;
-}
-
-// Convenience for the per-row Copy button
-function copyEntriesToTodaySingle(hid){
-  var result=copyEntriesToToday([hid]);
-  alert(buildCopyResultMessage(result));
-  render();
-}
-
-// Planned entries: future eat entries that haven't yet been confirmed.
-// They live in S.history with type='planned' and don't count toward macros.
-
-// Confirm a single plan: deduct stock if available and convert to a real eat entry,
-// OR for manual-kind plans, just convert into a manual entry dated now.
-// Returns {confirmed:0|1, partial, missing, noStock}.
-function confirmPlannedEntry(hid){
-  var plan=S.history.filter(function(x){return x.hid===hid;})[0];
-  if(!plan || plan.type!=='planned') return {confirmed:0};
-  var nowIso=new Date().toISOString();
-  // Manual-kind plans just become regular manual entries, no stock involved
-  if(plan.plannedKind==='manual'){
-    S.history=S.history.map(function(x){
-      if(x.hid!==hid) return x;
-      return {
-        hid:x.hid,
-        type:'manual',
-        label:plan.label,
-        cal:plan.cal,
-        protein:plan.protein,
-        carbs:plan.carbs,
-        fat:plan.fat,
-        date:nowIso
-      };
-    });
-    return {confirmed:1};
-  }
-  // Otherwise (eat-kind, or legacy plans without plannedKind set)
-  var it=S.items.filter(function(x){return x.id===plan.itemId;})[0];
-  if(!it){
-    // Item is gone — remove the plan and report
-    S.history=S.history.filter(function(x){return x.hid!==hid;});
-    return {confirmed:0, missing:plan.itemName};
-  }
-  if(it.portions<=0){
-    return {confirmed:0, noStock:plan.itemName};
-  }
-  var requested=plan.portions;
-  var actual=Math.min(requested, it.portions);
-  // Deduct stock
-  S.items=S.items.map(function(x){
-    if(x.id!==it.id) return x;
-    return {id:x.id,name:x.name,category:x.category,unit:x.unit,portions:Math.max(0,x.portions-actual),totalPortions:x.totalPortions,expiryDays:x.expiryDays,macros:x.macros,notes:x.notes,prepDate:x.prepDate,lastEaten:nowIso,archived:x.archived};
-  });
-  // Replace the planned entry with a real eat entry, dated now
-  S.history=S.history.map(function(x){
-    if(x.hid!==hid) return x;
-    return {
-      hid:x.hid,
-      type:'eat',
-      itemId:it.id,
-      itemName:it.name,
-      portions:actual,
-      unit:plan.unit||unitOf(it),
-      date:nowIso
-    };
-  });
-  delete S.dismissedAlerts['fgt-'+it.id];
-  var partial=null;
-  if(actual<requested){ partial={name:plan.itemName, requested:requested, actual:actual, unit:plan.unit||unitOf(it)}; }
-  return {confirmed:1, partial:partial};
-}
-
-function confirmPlannedEntryUI(hid){
-  var r=confirmPlannedEntry(hid);
-  save();
-  if(r.missing){ alert('Skipped (item removed): '+r.missing); }
-  else if(r.noStock){ alert('Cannot confirm — no stock left for: '+r.noStock); }
-  else if(r.partial){
-    var p=r.partial;
-    var sfx=p.unit==='portions'?(' portion'+(p.actual!==1?'s':'')):p.unit;
-    var rsfx=p.unit==='portions'?(' portion'+(p.requested!==1?'s':'')):p.unit;
-    alert('Partial: '+p.name+' — only '+p.actual+sfx+' available (wanted '+p.requested+rsfx+')');
-  }
-  render();
-}
-
-function cancelPlannedEntry(hid){
-  S.history=S.history.filter(function(x){return x.hid!==hid;});
-  save();
-  render();
-}
-
-function confirmAllPlannedToday(){
-  var t=todayStr();
-  var planned=S.history.filter(function(x){return x.type==='planned' && x.date && x.date.indexOf(t)===0;});
-  if(!planned.length) return;
-  var result={confirmed:0, partial:[], noStock:[], missing:[]};
-  planned.forEach(function(p){
-    var r=confirmPlannedEntry(p.hid);
-    if(r.confirmed) result.confirmed++;
-    if(r.partial) result.partial.push(r.partial);
-    if(r.noStock) result.noStock.push(r.noStock);
-    if(r.missing) result.missing.push(r.missing);
-  });
-  save();
-  // Build a summary message
-  var lines=[];
-  if(result.confirmed>0) lines.push(result.confirmed+' plan'+(result.confirmed===1?'':'s')+' confirmed.');
-  if(result.partial.length){
-    result.partial.forEach(function(p){
-      var sfx=p.unit==='portions'?(' portion'+(p.actual!==1?'s':'')):p.unit;
-      var rsfx=p.unit==='portions'?(' portion'+(p.requested!==1?'s':'')):p.unit;
-      lines.push('Partial: '+p.name+' — only '+p.actual+sfx+' available (wanted '+p.requested+rsfx+')');
-    });
-  }
-  if(result.noStock.length) lines.push('No stock: '+result.noStock.join(', '));
-  if(result.missing.length) lines.push('Item removed: '+result.missing.join(', '));
-  if(lines.length) alert(lines.join('\n'));
-  render();
-}
-
-// Calendar modal openers. Mode determines what date selection does:
-//   'navigate' — sets S.selectedDate (jumps the History view to that day)
-//   'copy-target' — sets S.copyTargetDate then triggers copy execution
-function openCalendar(mode){
-  var anchor=mode==='copy-target'?todayStr():(S.selectedDate||todayStr());
-  S.calMonth=monthStr(anchor);
-  S.modal={type:'calendar',mode:mode};
-  render();
-}
-
-function selectCalendarDate(dateStr){
-  if(!S.modal || S.modal.type!=='calendar') return;
-  var mode=S.modal.mode;
-  if(mode==='navigate'){
-    S.selectedDate=dateStr;
-    S.historySelectMode=false;
-    S.selectedHids={};
-    S.modal=null;
-    render();
-  } else if(mode==='copy-target'){
-    S.copyTargetDate=dateStr;
-    S.modal=null;
-    executePendingCopy();
-  } else if(mode==='plan-target'){
-    executePendingPlan(dateStr);
-  }
-}
-
-// Pending copy state — set by copyEntireDay/copySelectedEntries with confirmation flow
-var pendingCopy=null;
-// Pending plan state — set by planMealForLater with the captured item + portions
-var pendingPlan=null;
-
-// Open the calendar in copy-target mode for selecting a future date.
-// On selection, creates a 'planned' entry for the held item.
-function planMealForLater(){
-  if(!S.modal || S.modal.type!=='log') return;
-  var it=S.modal.item; if(!it) return;
-  var n=parseFloat(S.logPortions); if(!n||n<=0) return;
-  pendingPlan={kind:'eat', itemId:it.id, itemName:it.name, portions:n, unit:unitOf(it)};
-  S.modal=null;
-  S.calMonth=monthStr(todayStr());
-  S.modal={type:'calendar',mode:'plan-target'};
-  render();
-}
-
-function planManualEntryForLater(){
-  if(!S.modal || S.modal.type!=='manual-entry') return;
-  var f=S.manualForm||{};
-  var cal=parseFloat(f.cal)||0;
-  var protein=parseFloat(f.protein)||0;
-  var carbs=parseFloat(f.carbs)||0;
-  var fat=parseFloat(f.fat)||0;
-  if(cal<=0 && protein<=0 && carbs<=0 && fat<=0){
-    alert('Please enter at least one macro value.');
-    return;
-  }
-  var label=(f.label||'').trim()||'Untitled';
-  pendingPlan={kind:'manual', label:label, cal:cal, protein:protein, carbs:carbs, fat:fat};
-  S.modal=null;
-  S.calMonth=monthStr(todayStr());
-  S.modal={type:'calendar',mode:'plan-target'};
-  render();
-}
-
-function executePendingPlan(dateStr){
-  if(!pendingPlan) return;
-  var nowIso=dateStr===todayStr() ? new Date().toISOString() : (dateStr+'T12:00:00.000Z');
-  var entry;
-  if(pendingPlan.kind==='manual'){
-    entry={
-      hid:newHid(),
-      type:'planned',
-      plannedKind:'manual',
-      label:pendingPlan.label,
-      cal:pendingPlan.cal,
-      protein:pendingPlan.protein,
-      carbs:pendingPlan.carbs,
-      fat:pendingPlan.fat,
-      date:nowIso
-    };
-  } else {
-    entry={
-      hid:newHid(),
-      type:'planned',
-      plannedKind:'eat',
-      itemId:pendingPlan.itemId,
-      itemName:pendingPlan.itemName,
-      portions:pendingPlan.portions,
-      unit:pendingPlan.unit,
-      date:nowIso
-    };
-  }
-  S.history.unshift(entry);
-  var label=fmtDateLabel(dateStr).toLowerCase();
-  pendingPlan=null;
-  S.modal=null;
-  S.logPortions=1;
-  S.manualForm=null;
-  save();
-  render();
-  setTimeout(function(){
-    alert('Planned for '+label+'. View it in History or on the day itself to confirm.');
-  },50);
-}
-
-function confirmCopyEntireDay(dateStr){
-  var copyableHids=S.history.filter(function(x){
-    if(!x.date || x.date.indexOf(dateStr)!==0) return false;
-    return x.type==='eat' || x.type==='manual';
-  }).map(function(x){return x.hid;}).filter(Boolean);
-  if(!copyableHids.length){ alert('Nothing to copy from this day.'); return; }
-  pendingCopy={hids:copyableHids, sourceLabel:fmtDateLabel(dateStr), kind:'entire-day'};
-  S.modal={type:'confirm-copy'};
-  render();
-}
-
-function confirmCopySelected(){
-  var hids=Object.keys(S.selectedHids).filter(function(k){return S.selectedHids[k];});
-  if(!hids.length){ S.historySelectMode=false; render(); return; }
-  pendingCopy={hids:hids, sourceLabel:fmtDateLabel(S.selectedDate||todayStr()), kind:'selected'};
-  S.modal={type:'confirm-copy'};
-  render();
-}
-
-// Single-entry confirm flow (used from "today" rows where direct-copy-to-today doesn't make sense)
-function confirmCopySingle(hid){
-  var src=S.history.filter(function(x){return x.hid===hid;})[0];
-  if(!src) return;
-  pendingCopy={hids:[hid], sourceLabel:fmtDateLabel((src.date||'').split('T')[0]||todayStr()), kind:'single'};
-  S.modal={type:'confirm-copy'};
-  render();
-}
-
-function executePendingCopy(){
-  if(!pendingCopy) return;
-  var dest=S.copyTargetDate||todayStr();
-  var result=copyEntriesToDate(pendingCopy.hids, dest);
-  pendingCopy=null;
-  S.copyTargetDate=null;
-  S.historySelectMode=false;
-  S.selectedHids={};
-  alert(buildCopyResultMessage(result, dest));
-  render();
 }
 
 // ── Settings view
