@@ -1475,7 +1475,7 @@ function renderHistory(){
 
   var h='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">';
   h+='<div class="pm-heading" style="font-size:28px;font-weight:600;letter-spacing:0.04em;">History</div>';
-  if(!S.historySelectMode && copyableCount>0 && !isToday){
+  if(!S.historySelectMode && copyableCount>0){
     h+='<button onclick="toggleSelectMode()" style="background:transparent;border:1px solid #d9c9a8;color:#5c3d2e;border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;">Multi-copy</button>';
   } else if(S.historySelectMode){
     h+='<button onclick="toggleSelectMode()" style="background:transparent;border:1px solid #d9c9a8;color:#5c3d2e;border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;">Cancel</button>';
@@ -1536,8 +1536,8 @@ function renderHistory(){
     }
   }
 
-  // Copy controls (only when not on today)
-  if(!isToday && copyableCount>0){
+  // Copy controls
+  if(copyableCount>0){
     if(S.historySelectMode){
       var selectedCount=Object.keys(S.selectedHids).filter(function(k){return S.selectedHids[k];}).length;
       h+='<div style="display:flex;gap:8px;margin-bottom:14px;">';
@@ -1598,8 +1598,14 @@ function renderHistory(){
       rowHtml+='<div style="font-size:18px;width:26px;text-align:center;flex-shrink:0;">'+icon+'</div>';
       rowHtml+='<div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:700;">'+esc(name)+'</div>';
       rowHtml+='<div style="font-size:12px;color:#8a7560;">'+meta+'</div></div>';
-      if(!isToday && copyable && !S.historySelectMode){
-        rowHtml+='<button onclick="event.stopPropagation();copyEntriesToTodaySingle(\''+x.hid+'\')" style="background:transparent;border:1px solid #d9c9a8;color:#5c3d2e;border-radius:8px;padding:5px 10px;font-size:11px;cursor:pointer;flex-shrink:0;">Copy</button>';
+      if(copyable && !S.historySelectMode){
+        if(isToday){
+          // From today, single-row copy must let the user pick a destination day
+          rowHtml+='<button onclick="event.stopPropagation();confirmCopySingle(\''+x.hid+'\')" style="background:transparent;border:1px solid #d9c9a8;color:#5c3d2e;border-radius:8px;padding:5px 10px;font-size:11px;cursor:pointer;flex-shrink:0;">Copy</button>';
+        } else {
+          // From a past day, single-row copy goes straight to today (fast path)
+          rowHtml+='<button onclick="event.stopPropagation();copyEntriesToTodaySingle(\''+x.hid+'\')" style="background:transparent;border:1px solid #d9c9a8;color:#5c3d2e;border-radius:8px;padding:5px 10px;font-size:11px;cursor:pointer;flex-shrink:0;">Copy</button>';
+        }
       }
       rowHtml+='</div>';
     }
@@ -1801,6 +1807,15 @@ function confirmCopySelected(){
   render();
 }
 
+// Single-entry confirm flow (used from "today" rows where direct-copy-to-today doesn't make sense)
+function confirmCopySingle(hid){
+  var src=S.history.filter(function(x){return x.hid===hid;})[0];
+  if(!src) return;
+  pendingCopy={hids:[hid], sourceLabel:fmtDateLabel((src.date||'').split('T')[0]||todayStr()), kind:'single'};
+  S.modal={type:'confirm-copy'};
+  render();
+}
+
 function executePendingCopy(){
   if(!pendingCopy) return;
   var dest=S.copyTargetDate||todayStr();
@@ -1967,13 +1982,23 @@ function renderModal(){
   } else if(m.type==='confirm-copy'){
     var pc=pendingCopy||{hids:[],sourceLabel:'',kind:''};
     var count=pc.hids.length;
-    var destLabel=S.copyTargetDate?fmtDateLabel(S.copyTargetDate):'today';
+    var sourceIsToday=pc.sourceLabel==='Today';
+    // For source=today, default destination is tomorrow. Otherwise it's today.
+    var defaultDest=sourceIsToday?shiftDate(todayStr(),1):todayStr();
+    var defaultDestLabel=fmtDateLabel(defaultDest);
+    var destLabel=S.copyTargetDate?fmtDateLabel(S.copyTargetDate):defaultDestLabel.toLowerCase();
     h+='<div style="'+sheet+'">';
     h+='<div class="pm-heading" style="font-size:22px;font-weight:600;letter-spacing:0.04em;margin-bottom:4px;">Copy '+count+' entr'+(count===1?'y':'ies')+'?</div>';
-    h+='<div style="color:#8a7560;font-size:13px;margin-bottom:18px;">From <strong>'+esc(pc.sourceLabel)+'</strong> to <strong>'+esc(destLabel)+'</strong>. Eat entries will deduct from current stock where available.</div>';
+    h+='<div style="color:#8a7560;font-size:13px;margin-bottom:18px;">From <strong>'+esc(pc.sourceLabel)+'</strong>. '+(sourceIsToday?'Future eat entries become plans you can confirm on the day.':'Eat entries will deduct from current stock where available.')+'</div>';
     h+='<div style="display:flex;flex-direction:column;gap:8px;">';
-    h+='<button onclick="executePendingCopy();" style="'+cs.btnPrimary+'width:100%;">Copy to today</button>';
-    h+='<button onclick="openCalendar(\'copy-target\');" style="background:transparent;border:1px solid #d9c9a8;color:#5c3d2e;border-radius:10px;padding:12px;width:100%;font-size:13px;cursor:pointer;">Choose a different day&hellip;</button>';
+    if(sourceIsToday){
+      // Quick "Copy to tomorrow" + calendar
+      h+='<button onclick="S.copyTargetDate=\''+defaultDest+'\';executePendingCopy();" style="'+cs.btnPrimary+'width:100%;">Copy to tomorrow</button>';
+      h+='<button onclick="openCalendar(\'copy-target\');" style="background:transparent;border:1px solid #d9c9a8;color:#5c3d2e;border-radius:10px;padding:12px;width:100%;font-size:13px;cursor:pointer;">Choose a different day&hellip;</button>';
+    } else {
+      h+='<button onclick="executePendingCopy();" style="'+cs.btnPrimary+'width:100%;">Copy to today</button>';
+      h+='<button onclick="openCalendar(\'copy-target\');" style="background:transparent;border:1px solid #d9c9a8;color:#5c3d2e;border-radius:10px;padding:12px;width:100%;font-size:13px;cursor:pointer;">Choose a different day&hellip;</button>';
+    }
     h+='<button onclick="pendingCopy=null;S.modal=null;render();" style="'+cs.btnSecondary+'width:100%;">Cancel</button>';
     h+='</div></div>';
 
