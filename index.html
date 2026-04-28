@@ -493,16 +493,31 @@ function copyEntriesToDate(hids, dateStr){
     var src=S.history.filter(function(x){return x.hid===hid;})[0];
     if(!src) return;
     if(src.type==='manual'){
-      S.history.unshift({
-        hid:newHid(),
-        type:'manual',
-        label:src.label,
-        cal:src.cal,
-        protein:src.protein,
-        carbs:src.carbs,
-        fat:src.fat,
-        date:destIso
-      });
+      if(isFuture){
+        // Future manual entries become plans too — they shouldn't count toward macros until confirmed
+        S.history.unshift({
+          hid:newHid(),
+          type:'planned',
+          plannedKind:'manual',
+          label:src.label,
+          cal:src.cal,
+          protein:src.protein,
+          carbs:src.carbs,
+          fat:src.fat,
+          date:destIso
+        });
+      } else {
+        S.history.unshift({
+          hid:newHid(),
+          type:'manual',
+          label:src.label,
+          cal:src.cal,
+          protein:src.protein,
+          carbs:src.carbs,
+          fat:src.fat,
+          date:destIso
+        });
+      }
       result.copied++;
     } else if(src.type==='eat'){
       var it=S.items.filter(function(x){return x.id===src.itemId;})[0];
@@ -513,6 +528,7 @@ function copyEntriesToDate(hids, dateStr){
         S.history.unshift({
           hid:newHid(),
           type:'planned',
+          plannedKind:'eat',
           itemId:it.id,
           itemName:it.name,
           portions:src.portions,
@@ -1325,21 +1341,35 @@ function renderToday(){
     h+='</div>';
     h+='<div style="background:#fffbf4;border-radius:12px;border:1px dashed #c8922a;padding:0 14px;margin-bottom:16px;">';
     plannedToday.forEach(function(x,i){
-      var it=S.items.filter(function(z){return z.id===x.itemId;})[0];
-      var u=x.unit||(it?unitOf(it):'portions');
-      var unitSuffix=u==='portions'?(' portion'+(x.portions>1?'s':'')):u;
-      var stockNote='';
-      if(!it){
-        stockNote=' · <span style="color:#a84f2e;">item removed</span>';
-      } else if(it.portions<=0){
-        stockNote=' · <span style="color:#a84f2e;">no stock</span>';
-      } else if(it.portions<x.portions){
-        stockNote=' · <span style="color:#c8922a;">only '+it.portions+(u==='portions'?'':u)+' available</span>';
+      var isManualPlan=x.plannedKind==='manual';
+      var rowName, rowDetail;
+      if(isManualPlan){
+        rowName=x.label||'Untitled';
+        var parts=[];
+        if(x.cal) parts.push(Math.round(x.cal)+' cal');
+        if(x.protein) parts.push(Math.round(x.protein)+'g pro');
+        if(x.carbs) parts.push(Math.round(x.carbs)+'g carbs');
+        if(x.fat) parts.push(Math.round(x.fat)+'g fat');
+        rowDetail='Manual plan'+(parts.length?' · '+parts.join(' · '):'');
+      } else {
+        rowName=x.itemName;
+        var it=S.items.filter(function(z){return z.id===x.itemId;})[0];
+        var u=x.unit||(it?unitOf(it):'portions');
+        var unitSuffix=u==='portions'?(' portion'+(x.portions>1?'s':'')):u;
+        var stockNote='';
+        if(!it){
+          stockNote=' · <span style="color:#a84f2e;">item removed</span>';
+        } else if(it.portions<=0){
+          stockNote=' · <span style="color:#a84f2e;">no stock</span>';
+        } else if(it.portions<x.portions){
+          stockNote=' · <span style="color:#c8922a;">only '+it.portions+(u==='portions'?'':u)+' available</span>';
+        }
+        rowDetail=x.portions+unitSuffix+stockNote;
       }
       h+='<div style="display:flex;align-items:center;gap:10px;padding:10px 0;'+(i<plannedToday.length-1?'border-bottom:1px solid #eadec5;':'')+'">';
       h+='<div style="flex:1;min-width:0;">';
-      h+='<div style="font-size:14px;font-weight:700;">'+esc(x.itemName)+'</div>';
-      h+='<div style="font-size:12px;color:#8a7560;">'+x.portions+unitSuffix+stockNote+'</div>';
+      h+='<div style="font-size:14px;font-weight:700;">'+esc(rowName)+'</div>';
+      h+='<div style="font-size:12px;color:#8a7560;">'+rowDetail+'</div>';
       h+='</div>';
       h+='<button onclick="confirmPlannedEntryUI(\''+x.hid+'\')" style="background:#5c3d2e;color:#faf6ef;border:none;border-radius:8px;padding:6px 10px;font-size:11px;cursor:pointer;flex-shrink:0;">Confirm</button>';
       h+='<button onclick="cancelPlannedEntry(\''+x.hid+'\')" style="background:transparent;border:1px solid #d9c9a8;color:#8a7560;border-radius:8px;padding:5px 9px;font-size:11px;cursor:pointer;flex-shrink:0;">Cancel</button>';
@@ -1520,10 +1550,18 @@ function renderHistory(){
     // No actual entries yet, but there are plans — show projected macros
     var pc=0,pp=0,pcb=0,pf=0,pany=false;
     plannedEntries.forEach(function(x){
-      var it=S.items.filter(function(z){return z.id===x.itemId;})[0];
-      if(!it) return;
-      var mm=macroFor(it,x.portions);
-      if(mm){pc+=mm.cal;pp+=mm.protein;pcb+=mm.carbs;pf+=mm.fat;pany=true;}
+      if(x.plannedKind==='manual'){
+        pc+=parseFloat(x.cal||0);
+        pp+=parseFloat(x.protein||0);
+        pcb+=parseFloat(x.carbs||0);
+        pf+=parseFloat(x.fat||0);
+        pany=true;
+      } else {
+        var it=S.items.filter(function(z){return z.id===x.itemId;})[0];
+        if(!it) return;
+        var mm=macroFor(it,x.portions);
+        if(mm){pc+=mm.cal;pp+=mm.protein;pcb+=mm.carbs;pf+=mm.fat;pany=true;}
+      }
     });
     if(pany){
       h+='<div style="background:#fffbf4;border:1px dashed #c8922a;border-radius:12px;padding:12px 14px;margin-bottom:14px;">';
@@ -1626,21 +1664,35 @@ function renderHistory(){
     h+='<div style="font-size:11px;font-weight:700;color:#5c3d2e;text-transform:uppercase;letter-spacing:0.8px;margin:18px 0 6px;">📅 Planned ('+plannedEntries.length+')</div>';
     h+='<div style="background:#fffbf4;border-radius:12px;border:1px dashed #c8922a;padding:0 14px;margin-bottom:14px;">';
     plannedEntries.forEach(function(x,i){
-      var it=S.items.filter(function(z){return z.id===x.itemId;})[0];
-      var u=x.unit||(it?unitOf(it):'portions');
-      var unitSuffix=u==='portions'?(' portion'+(x.portions>1?'s':'')):u;
-      var stockNote='';
-      if(!it){
-        stockNote=' · <span style="color:#a84f2e;">item removed</span>';
-      } else if(it.portions<=0){
-        stockNote=' · <span style="color:#a84f2e;">no stock</span>';
-      } else if(it.portions<x.portions){
-        stockNote=' · <span style="color:#c8922a;">only '+it.portions+(u==='portions'?'':u)+' available</span>';
+      var isManualPlan=x.plannedKind==='manual';
+      var rowName, rowDetail;
+      if(isManualPlan){
+        rowName=x.label||'Untitled';
+        var parts=[];
+        if(x.cal) parts.push(Math.round(x.cal)+' cal');
+        if(x.protein) parts.push(Math.round(x.protein)+'g pro');
+        if(x.carbs) parts.push(Math.round(x.carbs)+'g carbs');
+        if(x.fat) parts.push(Math.round(x.fat)+'g fat');
+        rowDetail='Manual plan'+(parts.length?' · '+parts.join(' · '):'');
+      } else {
+        rowName=x.itemName;
+        var it=S.items.filter(function(z){return z.id===x.itemId;})[0];
+        var u=x.unit||(it?unitOf(it):'portions');
+        var unitSuffix=u==='portions'?(' portion'+(x.portions>1?'s':'')):u;
+        var stockNote='';
+        if(!it){
+          stockNote=' · <span style="color:#a84f2e;">item removed</span>';
+        } else if(it.portions<=0){
+          stockNote=' · <span style="color:#a84f2e;">no stock</span>';
+        } else if(it.portions<x.portions){
+          stockNote=' · <span style="color:#c8922a;">only '+it.portions+(u==='portions'?'':u)+' available</span>';
+        }
+        rowDetail=x.portions+unitSuffix+stockNote;
       }
       h+='<div style="display:flex;align-items:center;gap:10px;padding:10px 0;'+(i<plannedEntries.length-1?'border-bottom:1px solid #eadec5;':'')+'">';
       h+='<div style="font-size:18px;width:26px;text-align:center;flex-shrink:0;">📅</div>';
-      h+='<div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:700;">'+esc(x.itemName)+'</div>';
-      h+='<div style="font-size:12px;color:#8a7560;">'+x.portions+unitSuffix+stockNote+'</div></div>';
+      h+='<div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:700;">'+esc(rowName)+'</div>';
+      h+='<div style="font-size:12px;color:#8a7560;">'+rowDetail+'</div></div>';
       // Cancel button always available for plans
       h+='<button onclick="cancelPlannedEntry(\''+x.hid+'\')" style="background:transparent;border:1px solid #d9c9a8;color:#8a7560;border-radius:8px;padding:5px 9px;font-size:11px;cursor:pointer;flex-shrink:0;">Cancel</button>';
       h+='</div>';
@@ -1669,11 +1721,31 @@ function copyEntriesToTodaySingle(hid){
 // Planned entries: future eat entries that haven't yet been confirmed.
 // They live in S.history with type='planned' and don't count toward macros.
 
-// Confirm a single plan: deduct stock if available and convert to a real eat entry.
+// Confirm a single plan: deduct stock if available and convert to a real eat entry,
+// OR for manual-kind plans, just convert into a manual entry dated now.
 // Returns {confirmed:0|1, partial, missing, noStock}.
 function confirmPlannedEntry(hid){
   var plan=S.history.filter(function(x){return x.hid===hid;})[0];
   if(!plan || plan.type!=='planned') return {confirmed:0};
+  var nowIso=new Date().toISOString();
+  // Manual-kind plans just become regular manual entries, no stock involved
+  if(plan.plannedKind==='manual'){
+    S.history=S.history.map(function(x){
+      if(x.hid!==hid) return x;
+      return {
+        hid:x.hid,
+        type:'manual',
+        label:plan.label,
+        cal:plan.cal,
+        protein:plan.protein,
+        carbs:plan.carbs,
+        fat:plan.fat,
+        date:nowIso
+      };
+    });
+    return {confirmed:1};
+  }
+  // Otherwise (eat-kind, or legacy plans without plannedKind set)
   var it=S.items.filter(function(x){return x.id===plan.itemId;})[0];
   if(!it){
     // Item is gone — remove the plan and report
@@ -1685,7 +1757,6 @@ function confirmPlannedEntry(hid){
   }
   var requested=plan.portions;
   var actual=Math.min(requested, it.portions);
-  var nowIso=new Date().toISOString();
   // Deduct stock
   S.items=S.items.map(function(x){
     if(x.id!==it.id) return x;
@@ -1782,11 +1853,88 @@ function selectCalendarDate(dateStr){
     S.copyTargetDate=dateStr;
     S.modal=null;
     executePendingCopy();
+  } else if(mode==='plan-target'){
+    executePendingPlan(dateStr);
   }
 }
 
 // Pending copy state — set by copyEntireDay/copySelectedEntries with confirmation flow
 var pendingCopy=null;
+// Pending plan state — set by planMealForLater with the captured item + portions
+var pendingPlan=null;
+
+// Open the calendar in copy-target mode for selecting a future date.
+// On selection, creates a 'planned' entry for the held item.
+function planMealForLater(){
+  if(!S.modal || S.modal.type!=='log') return;
+  var it=S.modal.item; if(!it) return;
+  var n=parseFloat(S.logPortions); if(!n||n<=0) return;
+  pendingPlan={kind:'eat', itemId:it.id, itemName:it.name, portions:n, unit:unitOf(it)};
+  S.modal=null;
+  S.calMonth=monthStr(todayStr());
+  S.modal={type:'calendar',mode:'plan-target'};
+  render();
+}
+
+function planManualEntryForLater(){
+  if(!S.modal || S.modal.type!=='manual-entry') return;
+  var f=S.manualForm||{};
+  var cal=parseFloat(f.cal)||0;
+  var protein=parseFloat(f.protein)||0;
+  var carbs=parseFloat(f.carbs)||0;
+  var fat=parseFloat(f.fat)||0;
+  if(cal<=0 && protein<=0 && carbs<=0 && fat<=0){
+    alert('Please enter at least one macro value.');
+    return;
+  }
+  var label=(f.label||'').trim()||'Untitled';
+  pendingPlan={kind:'manual', label:label, cal:cal, protein:protein, carbs:carbs, fat:fat};
+  S.modal=null;
+  S.calMonth=monthStr(todayStr());
+  S.modal={type:'calendar',mode:'plan-target'};
+  render();
+}
+
+function executePendingPlan(dateStr){
+  if(!pendingPlan) return;
+  var nowIso=dateStr===todayStr() ? new Date().toISOString() : (dateStr+'T12:00:00.000Z');
+  var entry;
+  if(pendingPlan.kind==='manual'){
+    entry={
+      hid:newHid(),
+      type:'planned',
+      plannedKind:'manual',
+      label:pendingPlan.label,
+      cal:pendingPlan.cal,
+      protein:pendingPlan.protein,
+      carbs:pendingPlan.carbs,
+      fat:pendingPlan.fat,
+      date:nowIso
+    };
+  } else {
+    entry={
+      hid:newHid(),
+      type:'planned',
+      plannedKind:'eat',
+      itemId:pendingPlan.itemId,
+      itemName:pendingPlan.itemName,
+      portions:pendingPlan.portions,
+      unit:pendingPlan.unit,
+      date:nowIso
+    };
+  }
+  S.history.unshift(entry);
+  var label=fmtDateLabel(dateStr).toLowerCase();
+  pendingPlan=null;
+  S.modal=null;
+  S.logPortions=1;
+  S.manualForm=null;
+  save();
+  render();
+  setTimeout(function(){
+    alert('Planned for '+label+'. View it in History or on the day itself to confirm.');
+  },50);
+}
 
 function confirmCopyEntireDay(dateStr){
   var copyableHids=S.history.filter(function(x){
@@ -1915,8 +2063,8 @@ function renderModal(){
     var t=todayStr();
     var sel=S.selectedDate||t;
     var mode=m.mode||'navigate';
-    var titleText=mode==='copy-target'?'Copy to which day?':'Jump to day';
-    var subText=mode==='copy-target'?'Pick today or any future day':'Tap any day with activity';
+    var titleText=mode==='copy-target'?'Copy to which day?':mode==='plan-target'?'Plan for which day?':'Jump to day';
+    var subText=mode==='copy-target'?'Pick today or any future day':mode==='plan-target'?'Pick today or any future day':'Tap any day with activity';
 
     h+='<div style="'+sheet+'max-height:85vh;overflow-y:auto;">';
     h+='<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;">';
@@ -1961,8 +2109,8 @@ function renderModal(){
       var hasActivity=!!histDates[dStr];
       // Disable future dates in navigate mode unless they have activity (planned future entries)
       var disabled=(mode==='navigate' && isFuture && !hasActivity);
-      // For copy-target: disable past dates (only today + future allowed)
-      if(mode==='copy-target' && dStr<t) disabled=true;
+      // For copy-target / plan-target: disable past dates (only today + future allowed)
+      if((mode==='copy-target'||mode==='plan-target') && dStr<t) disabled=true;
       var bg=isSel?'#5c3d2e':(isToday2?'#f5ecd9':'transparent');
       var color=isSel?'#faf6ef':(disabled?'#c8b89a':'#5c3d2e');
       var border=isToday2&&!isSel?'1px solid #c8922a':'1px solid transparent';
@@ -2060,7 +2208,10 @@ function renderModal(){
     h+='<div style="display:flex;gap:10px;margin-top:16px;">';
     h+='<button onclick="S.modal=null;render();" style="'+cs.btnSecondary+'flex:1;">Cancel</button>';
     h+='<button onclick="logMeal();" style="'+cs.btnPrimary+'flex:1;">Log It</button>';
-    h+='</div></div>';
+    h+='</div>';
+    // Plan for later — opens calendar picker, creates a planned entry on the selected date (today + future allowed)
+    h+='<button onclick="planMealForLater();" style="background:transparent;border:1px dashed #c8922a;color:#5c3d2e;border-radius:10px;padding:10px;width:100%;font-size:13px;cursor:pointer;margin-top:10px;">📅 Plan for later instead</button>';
+    h+='</div>';
 
   } else if(m.type==='restock'){
     var rn=S.restockPortions;
@@ -2163,6 +2314,9 @@ function renderModal(){
     h+='<button onclick="S.modal=null;S.manualForm=null;render();" style="'+cs.btnSecondary+'flex:1;">Cancel</button>';
     h+='<button onclick="saveManualEntry();" style="'+cs.btnPrimary+'flex:1;">'+(isEdit?'Save Changes':'Add Entry')+'</button>';
     h+='</div>';
+    if(!isEdit){
+      h+='<button onclick="planManualEntryForLater();" style="background:transparent;border:1px dashed #c8922a;color:#5c3d2e;border-radius:10px;padding:10px;width:100%;font-size:13px;cursor:pointer;margin-top:10px;">📅 Plan for later instead</button>';
+    }
     if(isEdit){
       h+='<button onclick="deleteManualEntry(\''+m.editingHid+'\');" style="background:transparent;border:1px dashed #b85c38;color:#b85c38;border-radius:10px;padding:10px;width:100%;font-size:13px;cursor:pointer;margin-top:12px;">Delete entry</button>';
     }
