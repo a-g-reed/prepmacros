@@ -45,11 +45,11 @@ function getCats(){
 }
 // Legacy var kept for compatibility with inline references that still read CATS
 Object.defineProperty(window,'CATS',{get:function(){return getCats();}});
-var DEFAULTS = { lowStockThreshold:3, expiryDays:5, forgottenDays:14, targetCal:0, targetProtein:0, targetCarbs:0, targetFat:0, categories:['Protein','Carbs','Veg','Snack','Dessert','Creami Base','Other'] };
+var DEFAULTS = { lowStockThreshold:3, expiryDays:5, forgottenDays:14, targetCal:0, targetProtein:0, targetCarbs:0, targetFat:0, categories:['Protein','Carbs','Veg','Snack','Dessert','Creami Base','Other'], seenAlerts:{} };
 
 // ── State ────────────────────────────────────────────────────────────────────
 var S = {
-  items:[], history:[], settings:{lowStockThreshold:3,expiryDays:5,forgottenDays:14,targetCal:0,targetProtein:0,targetCarbs:0,targetFat:0,categories:['Protein','Carbs','Veg','Snack','Dessert','Creami Base','Other']},
+  items:[], history:[], settings:{lowStockThreshold:3,expiryDays:5,forgottenDays:14,targetCal:0,targetProtein:0,targetCarbs:0,targetFat:0,categories:['Protein','Carbs','Veg','Snack','Dessert','Creami Base','Other'],seenAlerts:{}},
   dismissedAlerts:{}, view:'stock', filterCat:'All', expandedId:null,
   modal:null, logPortions:1, restockPortions:1, wastePortions:1, editForm:null,
   syncStatus:'syncing', syncMsg:'Loading\u2026',
@@ -155,6 +155,71 @@ function getAlerts(){
       alerts.push({key:'fgt-'+it.id,type:'forgotten',item:it,msg:"Haven't eaten "+esc(it.name),badge:sinceEat+'d',col:'#6050a0'});
   });
   return alerts;
+}
+
+// ── Stock notifications (bell): Low / Out / Expired / Expiring soon / Forgotten
+// Returns grouped, sorted by severity. Each entry has a stable key so we can
+// track which ones the user has already seen.
+function getStockNotifications(){
+  var groups={expired:[],out:[],low:[],expiring:[],forgotten:[]};
+  S.items.forEach(function(it){
+    if(isArchived(it))return;
+    // Out
+    if(it.portions===0){
+      groups.out.push({key:'out-'+it.id,type:'out',item:it,detail:'Out of stock'});
+      return; // don't compound out with low/expired
+    }
+    // Expired / expiring
+    var expDays=it.expiryDays!=null?it.expiryDays:S.settings.expiryDays;
+    var age=daysSince(it.prepDate);
+    if(expDays&&age!==null){
+      if(age>=expDays){
+        groups.expired.push({key:'exp-'+it.id,type:'expired',item:it,detail:'Expired '+(age-expDays===0?'today':(age-expDays)+'d ago')});
+      } else if(age>=expDays-1){
+        groups.expiring.push({key:'expw-'+it.id,type:'expiring',item:it,detail:'Expires soon'});
+      }
+    }
+    // Low (only if not already expired)
+    if(it.portions>0 && it.portions<=S.settings.lowStockThreshold){
+      var alreadyFlagged=groups.expired.filter(function(g){return g.item.id===it.id;}).length>0;
+      if(!alreadyFlagged) groups.low.push({key:'low-'+it.id,type:'low',item:it,detail:it.portions+' '+(unitOf(it)==='portions'?'portion'+(it.portions!==1?'s':''):unitOf(it))+' left'});
+    }
+    // Forgotten
+    var sinceEat=daysSince(it.lastEaten||it.prepDate);
+    if(sinceEat!==null && sinceEat>=S.settings.forgottenDays){
+      groups.forgotten.push({key:'fgt-'+it.id,type:'forgotten',item:it,detail:"Haven't eaten in "+sinceEat+' days'});
+    }
+  });
+  return groups;
+}
+
+function allNotificationKeys(){
+  var groups=getStockNotifications();
+  var keys=[];
+  ['expired','out','low','expiring','forgotten'].forEach(function(g){
+    groups[g].forEach(function(n){ keys.push(n.key); });
+  });
+  return keys;
+}
+
+function hasUnseenNotifications(){
+  var seen=S.settings.seenAlerts||{};
+  var keys=allNotificationKeys();
+  for(var i=0;i<keys.length;i++){ if(!seen[keys[i]]) return true; }
+  return false;
+}
+
+function markAllNotificationsSeen(){
+  if(!S.settings.seenAlerts) S.settings.seenAlerts={};
+  var keys=allNotificationKeys();
+  var nowIso=new Date().toISOString();
+  keys.forEach(function(k){ S.settings.seenAlerts[k]=nowIso; });
+  // Also prune entries for items/states that no longer exist (housekeeping)
+  var keySet={}; keys.forEach(function(k){keySet[k]=1;});
+  Object.keys(S.settings.seenAlerts).forEach(function(k){
+    if(!keySet[k]) delete S.settings.seenAlerts[k];
+  });
+  save();
 }
 
 // ── Storage ───────────────────────────────────────────────────────────────────
@@ -518,7 +583,7 @@ function render(){
   var safeTop='max(env(safe-area-inset-top),12px)';
   var safeBot='calc(env(safe-area-inset-bottom) + 20px)';
 
-  var macros=todayMacros(); var alerts=getAlerts(); var low=lowC(); var out=outC();
+  var macros=todayMacros();
 
   // ── Header
   var header='<div style="background:#5c3d2e;padding:'+safeTop+' 20px 0;position:sticky;top:0;z-index:100;">';
@@ -561,9 +626,19 @@ function render(){
     header+='<div style="background:rgba(255,255,255,0.1);border-radius:20px;padding:4px 10px;text-align:center;"><div style="font-size:14px;font-weight:700;color:#c8922a;">'+macros.cal+'</div><div style="font-size:9px;color:#d9c9a8;text-transform:uppercase;">Cal today</div></div>';
   }
 
-  if(low)header+='<button onclick="jumpToLowStock()" style="background:rgba(255,255,255,0.1);border:none;border-radius:20px;padding:4px 10px;text-align:center;cursor:pointer;"><div style="font-size:14px;font-weight:700;color:#d4a843;">'+low+'</div><div style="font-size:9px;color:#d9c9a8;text-transform:uppercase;">Low</div></button>';
-  if(out)header+='<button onclick="jumpToOutStock()" style="background:rgba(255,255,255,0.1);border:none;border-radius:20px;padding:4px 10px;text-align:center;cursor:pointer;"><div style="font-size:14px;font-weight:700;color:#b85c38;">'+out+'</div><div style="font-size:9px;color:#d9c9a8;text-transform:uppercase;">Out</div></button>';
-  if(alerts.length)header+='<div style="background:rgba(255,255,255,0.1);border-radius:20px;padding:4px 10px;text-align:center;"><div style="font-size:14px;font-weight:700;color:#e0a030;">'+alerts.length+'</div><div style="font-size:9px;color:#d9c9a8;text-transform:uppercase;">Alerts</div></div>';
+  // Notifications bell (replaces Low / Out / Alerts pills)
+  var notifGroups=getStockNotifications();
+  var totalNotifs=notifGroups.expired.length+notifGroups.out.length+notifGroups.low.length+notifGroups.expiring.length+notifGroups.forgotten.length;
+  var hasUnseen=hasUnseenNotifications();
+  header+='<button onclick="openNotifications()" aria-label="Notifications" style="position:relative;background:rgba(255,255,255,0.1);border:none;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;">';
+  // Bell icon (SVG)
+  header+='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#faf6ef" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>';
+  if(totalNotifs>0 && hasUnseen){
+    // Red dot indicator (no count)
+    header+='<span style="position:absolute;top:6px;right:7px;width:9px;height:9px;border-radius:50%;background:#e0392b;border:2px solid #5c3d2e;"></span>';
+  }
+  header+='</button>';
+
   header+='</div></div>';
 
   // Today strip
@@ -582,19 +657,6 @@ function render(){
         header+='<div style="font-size:13px;color:#faf6ef;font-weight:600;line-height:1.2;">'+val+sfx+'</div>';
       }
       header+='<div style="font-size:9px;color:#a8998a;text-transform:uppercase;letter-spacing:0.5px;margin-top:2px;">'+label+'</div>';
-      header+='</div>';
-    });
-    header+='</div>';
-  }
-
-  // Alerts banner
-  if(alerts.length){
-    header+='<div style="background:#fdf6e3;border-top:1px solid rgba(200,160,60,0.25);padding:6px 16px;">';
-    alerts.forEach(function(a){
-      header+='<div style="display:flex;align-items:center;padding:5px 0;border-bottom:1px solid rgba(0,0,0,0.05);">';
-      header+='<div style="flex:1;font-size:13px;color:#5c3d2e;">'+a.msg+'</div>';
-      header+='<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:'+a.col+'22;color:'+a.col+';margin-left:8px;">'+a.badge+'</span>';
-      header+='<button onclick="dismissAlert(\''+a.key+'\')" style="background:none;border:none;font-size:15px;color:#b09050;cursor:pointer;padding:0 2px 0 8px;">&#x2715;</button>';
       header+='</div>';
     });
     header+='</div>';
@@ -637,6 +699,28 @@ function setView(v){
 }
 function jumpToLowStock(){ S.stockFilter='low'; S.view='stock'; S.filterCat='All'; render(); }
 function jumpToOutStock(){ S.stockFilter='out'; S.view='stock'; S.filterCat='All'; render(); }
+
+function openNotifications(){
+  // Mark current notifications as seen the moment the modal opens
+  markAllNotificationsSeen();
+  S.modal={type:'notifications'};
+  render();
+}
+
+function jumpToItem(id){
+  // Close modal, switch to Stock view, expand the item card
+  S.modal=null;
+  S.view='stock';
+  S.filterCat='All';
+  S.stockFilter='all';
+  S.expandedId=id;
+  render();
+  // Try to scroll the item into view after the render
+  setTimeout(function(){
+    var el=document.querySelector('[onclick*="toggleExpand(\''+id+'\')"]');
+    if(el && el.scrollIntoView) el.scrollIntoView({behavior:'smooth',block:'center'});
+  },50);
+}
 function dismissAlert(key){ S.dismissedAlerts[key]=todayStr(); save(); render(); }
 function toggleExpand(id){ S.expandedId=S.expandedId===id?null:id; render(); }
 
@@ -1315,7 +1399,52 @@ function renderModal(){
   var overlay='position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;display:flex;align-items:flex-end;animation:fadeIn 0.15s ease;';
   var h='<div style="'+overlay+'" onclick="if(event.target===this){S.modal=null;render();}">';
 
-  if(m.type==='log'){
+  if(m.type==='notifications'){
+    var groups=getStockNotifications();
+    var totalCount=groups.expired.length+groups.out.length+groups.low.length+groups.expiring.length+groups.forgotten.length;
+    h+='<div style="'+sheet+'max-height:85vh;overflow-y:auto;">';
+    h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">';
+    h+='<div class="pm-heading" style="font-size:24px;font-weight:600;letter-spacing:0.04em;">Notifications</div>';
+    h+='<button onclick="S.modal=null;render();" style="background:none;border:none;font-size:22px;color:#8a7560;cursor:pointer;padding:0 4px;line-height:1;">&times;</button>';
+    h+='</div>';
+
+    if(totalCount===0){
+      h+='<div style="text-align:center;padding:40px 20px;color:#8a7560;">';
+      h+='<div style="font-size:40px;margin-bottom:10px;">✨</div>';
+      h+='<div style="font-size:16px;font-weight:700;color:#5c3d2e;margin-bottom:4px;">All clear</div>';
+      h+='<div style="font-size:13px;">Nothing low, out, or expiring</div>';
+      h+='</div>';
+    } else {
+      // Render in severity order: Expired -> Out -> Low -> Expiring soon -> Forgotten
+      var sections=[
+        {key:'expired',label:'Expired',color:'#a84f2e',icon:'⚠️',entries:groups.expired},
+        {key:'out',label:'Out of stock',color:'#a84f2e',icon:'❌',entries:groups.out},
+        {key:'low',label:'Low stock',color:'#c8922a',icon:'⚡',entries:groups.low},
+        {key:'expiring',label:'Expiring soon',color:'#c8922a',icon:'🕐',entries:groups.expiring},
+        {key:'forgotten',label:'Forgotten',color:'#6b7c5e',icon:'💤',entries:groups.forgotten}
+      ];
+      sections.forEach(function(sec){
+        if(!sec.entries.length) return;
+        h+='<div style="margin-bottom:16px;">';
+        h+='<div style="font-size:11px;font-weight:700;color:#8a7560;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px;">'+sec.icon+' '+sec.label+' ('+sec.entries.length+')</div>';
+        h+='<div style="background:#faf6ef;border-radius:12px;border:1px solid #d9c9a8;padding:0 12px;">';
+        sec.entries.forEach(function(n,i){
+          var u=unitOf(n.item);
+          var portionDisplay=n.item.portions+(u==='portions'?'':u);
+          h+='<div onclick="jumpToItem(\''+n.item.id+'\')" style="display:flex;align-items:center;gap:10px;padding:10px 0;cursor:pointer;'+(i<sec.entries.length-1?'border-bottom:1px solid #eadec5;':'')+'">';
+          h+='<div style="flex:1;min-width:0;">';
+          h+='<div style="font-size:14px;font-weight:700;color:#5c3d2e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(n.item.name)+'</div>';
+          h+='<div style="font-size:12px;color:'+sec.color+';">'+esc(n.detail)+'</div>';
+          h+='</div>';
+          h+='<div style="font-size:13px;color:#8a7560;flex-shrink:0;">›</div>';
+          h+='</div>';
+        });
+        h+='</div></div>';
+      });
+    }
+    h+='</div>';
+
+  } else if(m.type==='log'){
     var n=S.logPortions;
     var u=unitOf(it);
     var unitTxt=u==='portions'?'':u;
