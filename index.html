@@ -55,6 +55,7 @@ var S = {
   syncStatus:'syncing', syncMsg:'Loading\u2026',
   showArchived:false, stockFilter:'all', histEditAmount:0, reorderMode:false,
   manualForm:null,
+  selectedDate:null, historySelectMode:false, selectedHids:{},
   form:{name:'',category:'Protein',unit:'portions',portions:'',expiryDays:'',cal:'',protein:'',carbs:'',fat:'',notes:''}
 };
 
@@ -63,6 +64,19 @@ function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')
 function daysSince(d){ if(!d)return null; return Math.floor((Date.now()-new Date(d))/86400000); }
 function daysAgo(d){ var n=daysSince(d); if(n===null)return null; if(n===0)return'today'; if(n===1)return'yesterday'; return n+'d ago'; }
 function todayStr(){ return new Date().toISOString().split('T')[0]; }
+function shiftDate(dateStr, days){
+  var d=new Date(dateStr+'T12:00:00');
+  d.setDate(d.getDate()+days);
+  return d.toISOString().split('T')[0];
+}
+function fmtDateLabel(dateStr){
+  if(dateStr===todayStr()) return 'Today';
+  var t=todayStr();
+  var yest=shiftDate(t,-1);
+  if(dateStr===yest) return 'Yesterday';
+  var d=new Date(dateStr+'T12:00:00');
+  return d.toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'});
+}
 function barColor(p){ return p>0.5?'#6b7c5e':p>0.25?'#c4a84b':'#b85c38'; }
 function isDismissedToday(k){ return S.dismissedAlerts[k]===todayStr(); }
 function isArchived(it){ return !!it.archived; }
@@ -434,6 +448,123 @@ function deleteHistoryEntry(hid){
   }
   S.history=S.history.filter(function(x){return x.hid!==hid;});
   save();S.modal=null;render();
+}
+
+// Copy history entries forward to today.
+// Returns a result {copied, skipped, partial} for user feedback.
+function copyEntriesToToday(hids){
+  var result={copied:0, skippedNoStock:[], skippedMissing:[], partial:[]};
+  var nowIso=new Date().toISOString();
+  hids.forEach(function(hid){
+    var src=S.history.filter(function(x){return x.hid===hid;})[0];
+    if(!src) return;
+    if(src.type==='manual'){
+      // Manual entries clone cleanly
+      S.history.unshift({
+        hid:newHid(),
+        type:'manual',
+        label:src.label,
+        cal:src.cal,
+        protein:src.protein,
+        carbs:src.carbs,
+        fat:src.fat,
+        date:nowIso
+      });
+      result.copied++;
+    } else if(src.type==='eat'){
+      // Eat entries — try to deduct from current stock
+      var it=S.items.filter(function(x){return x.id===src.itemId;})[0];
+      if(!it){
+        // Item no longer exists — skip
+        result.skippedMissing.push(src.itemName);
+        return;
+      }
+      if(it.portions<=0){
+        result.skippedNoStock.push(src.itemName);
+        return;
+      }
+      var requested=src.portions;
+      var actual=Math.min(requested, it.portions);
+      var unit=src.unit||unitOf(it);
+      // Deduct stock
+      S.items=S.items.map(function(x){
+        if(x.id!==it.id) return x;
+        return {id:x.id,name:x.name,category:x.category,unit:x.unit,portions:Math.max(0,x.portions-actual),totalPortions:x.totalPortions,expiryDays:x.expiryDays,macros:x.macros,notes:x.notes,prepDate:x.prepDate,lastEaten:nowIso,archived:x.archived};
+      });
+      // Add new history entry
+      S.history.unshift({
+        hid:newHid(),
+        type:'eat',
+        itemId:it.id,
+        itemName:it.name,
+        portions:actual,
+        unit:unit,
+        date:nowIso
+      });
+      delete S.dismissedAlerts['fgt-'+it.id];
+      result.copied++;
+      if(actual<requested){
+        result.partial.push({name:src.itemName, requested:requested, actual:actual, unit:unit});
+      }
+    }
+    // Note: prep, waste, deleted entries are not copied (would corrupt stock state)
+  });
+  save();
+  return result;
+}
+
+function buildCopyResultMessage(result){
+  var lines=[];
+  if(result.copied>0) lines.push(result.copied+' entr'+(result.copied===1?'y':'ies')+' copied to today.');
+  if(result.partial.length){
+    result.partial.forEach(function(p){
+      var sfx=p.unit==='portions'?(' portion'+(p.actual!==1?'s':'')):p.unit;
+      var rsfx=p.unit==='portions'?(' portion'+(p.requested!==1?'s':'')):p.unit;
+      lines.push('Partial: '+p.name+' — only '+p.actual+sfx+' available (wanted '+p.requested+rsfx+')');
+    });
+  }
+  if(result.skippedNoStock.length){
+    lines.push('Skipped (no stock): '+result.skippedNoStock.join(', '));
+  }
+  if(result.skippedMissing.length){
+    lines.push('Skipped (item removed): '+result.skippedMissing.join(', '));
+  }
+  return lines.join('\n');
+}
+
+function copyEntireDay(dateStr){
+  var hids=S.history.filter(function(x){
+    if(!x.date || x.date.indexOf(dateStr)!==0) return false;
+    return x.type==='eat' || x.type==='manual';
+  }).map(function(x){return x.hid;}).filter(Boolean);
+  if(!hids.length){ alert('Nothing to copy from this day.'); return; }
+  var result=copyEntriesToToday(hids);
+  S.historySelectMode=false;
+  S.selectedHids={};
+  alert(buildCopyResultMessage(result));
+  render();
+}
+
+function copySelectedEntries(){
+  var hids=Object.keys(S.selectedHids).filter(function(k){return S.selectedHids[k];});
+  if(!hids.length){ S.historySelectMode=false; render(); return; }
+  var result=copyEntriesToToday(hids);
+  S.historySelectMode=false;
+  S.selectedHids={};
+  alert(buildCopyResultMessage(result));
+  render();
+}
+
+function toggleSelectMode(){
+  S.historySelectMode=!S.historySelectMode;
+  S.selectedHids={};
+  render();
+}
+
+function toggleSelectedHid(hid){
+  if(S.selectedHids[hid]) delete S.selectedHids[hid];
+  else S.selectedHids[hid]=true;
+  render();
 }
 
 function openArchiveConfirm(id){
@@ -1262,61 +1393,150 @@ function renderToday(){
 
 // ── History view
 function renderHistory(){
-  var today=todayStr(), grouped={};
-  S.history.slice(0,100).forEach(function(h){
-    var d=h.date?h.date.split('T')[0]:'unknown';
-    if(!grouped[d])grouped[d]=[];
-    grouped[d].push(h);
+  if(!S.selectedDate) S.selectedDate=todayStr();
+  var sel=S.selectedDate;
+  var t=todayStr();
+  var isToday=sel===t;
+  var isFuture=sel>t;
+
+  // Find earliest history date for "no further back" detection
+  var earliestDate=null;
+  S.history.forEach(function(x){
+    if(!x.date) return;
+    var d=x.date.split('T')[0];
+    if(!earliestDate || d<earliestDate) earliestDate=d;
   });
-  var days=Object.keys(grouped).sort(function(a,b){return b.localeCompare(a);});
-  var h='<div class="pm-heading" style="font-size:28px;font-weight:600;margin-bottom:18px;letter-spacing:0.04em;">Activity History</div>';
-  if(!S.history.length){ h+='<div style="text-align:center;padding:40px;color:#8a7560;">No activity yet</div>'; return h; }
-  days.forEach(function(day){
-    var label=day===today?'Today':daysAgo(day+'T12:00:00')||day;
-    var dc=0,dp=0,dany=false;
-    grouped[day].forEach(function(x){
+  var canGoBack=!earliestDate || sel>earliestDate;
+  var canGoForward=!isToday && !isFuture; // never go past today
+
+  // Entries for selected day
+  var dayEntries=S.history.filter(function(x){return x.date && x.date.indexOf(sel)===0;});
+  // Sort newest first within the day
+  dayEntries.sort(function(a,b){return (b.date||'').localeCompare(a.date||'');});
+
+  var h='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">';
+  h+='<div class="pm-heading" style="font-size:28px;font-weight:600;letter-spacing:0.04em;">History</div>';
+  if(!S.historySelectMode && dayEntries.length){
+    h+='<button onclick="toggleSelectMode()" style="background:transparent;border:1px solid #d9c9a8;color:#5c3d2e;border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;">Select</button>';
+  } else if(S.historySelectMode){
+    h+='<button onclick="toggleSelectMode()" style="background:transparent;border:1px solid #d9c9a8;color:#5c3d2e;border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;">Cancel</button>';
+  }
+  h+='</div>';
+
+  // Date navigation
+  h+='<div style="display:flex;align-items:center;justify-content:space-between;background:#ffffff;border:1px solid #d9c9a8;border-radius:12px;padding:6px;margin-bottom:14px;">';
+  h+='<button onclick="S.selectedDate=shiftDate(S.selectedDate,-1);S.historySelectMode=false;S.selectedHids={};render();" '+(!canGoBack?'disabled':'')+' style="width:36px;height:36px;border-radius:8px;border:none;background:transparent;font-size:16px;cursor:pointer;color:#5c3d2e;opacity:'+(canGoBack?1:0.3)+';">◀</button>';
+  h+='<div onclick="S.selectedDate=todayStr();S.historySelectMode=false;S.selectedHids={};render();" style="text-align:center;flex:1;cursor:pointer;">';
+  h+='<div style="font-size:15px;font-weight:700;color:#5c3d2e;">'+esc(fmtDateLabel(sel))+'</div>';
+  if(!isToday) h+='<div style="font-size:11px;color:#8a7560;">tap to return to today</div>';
+  h+='</div>';
+  h+='<button onclick="S.selectedDate=shiftDate(S.selectedDate,1);S.historySelectMode=false;S.selectedHids={};render();" '+(!canGoForward?'disabled':'')+' style="width:36px;height:36px;border-radius:8px;border:none;background:transparent;font-size:16px;cursor:pointer;color:#5c3d2e;opacity:'+(canGoForward?1:0.3)+';">▶</button>';
+  h+='</div>';
+
+  // Day macro summary
+  if(dayEntries.length){
+    var dc=0,dp=0,dcb=0,df=0,dany=false;
+    dayEntries.forEach(function(x){
       if(x.type==='eat'){
         var it=S.items.filter(function(z){return z.id===x.itemId;})[0];
         if(!it) return;
         var mm=macroFor(it,x.portions);
-        if(mm){dc+=mm.cal;dp+=mm.protein;dany=true;}
+        if(mm){dc+=mm.cal;dp+=mm.protein;dcb+=mm.carbs;df+=mm.fat;dany=true;}
       } else if(x.type==='manual'){
         dc+=parseFloat(x.cal||0);
         dp+=parseFloat(x.protein||0);
+        dcb+=parseFloat(x.carbs||0);
+        df+=parseFloat(x.fat||0);
         dany=true;
       }
     });
-    h+='<div style="display:flex;justify-content:space-between;align-items:baseline;margin:16px 0 4px;">';
-    h+='<div style="font-size:11px;font-weight:700;color:#5c3d2e;text-transform:uppercase;letter-spacing:0.8px;">'+label+'</div>';
-    if(dany) h+='<div style="font-size:11px;color:#8a7560;">'+Math.round(dc)+' cal · '+Math.round(dp)+'g pro</div>';
+    if(dany){
+      h+='<div style="background:#ffffff;border:1px solid #d9c9a8;border-radius:12px;padding:12px 14px;margin-bottom:14px;display:flex;justify-content:space-around;gap:8px;">';
+      [['Cal',Math.round(dc)],['Protein',Math.round(dp)+'g'],['Carbs',Math.round(dcb)+'g'],['Fat',Math.round(df)+'g']].forEach(function(m){
+        h+='<div style="text-align:center;"><div style="font-size:14px;font-weight:700;color:#5c3d2e;">'+m[1]+'</div><div style="font-size:9px;color:#8a7560;text-transform:uppercase;letter-spacing:0.5px;">'+m[0]+'</div></div>';
+      });
+      h+='</div>';
+    }
+  }
+
+  // Copy controls when not viewing today
+  if(!isToday && dayEntries.length){
+    var copyableCount=dayEntries.filter(function(x){return x.type==='eat'||x.type==='manual';}).length;
+    if(S.historySelectMode){
+      var selectedCount=Object.keys(S.selectedHids).filter(function(k){return S.selectedHids[k];}).length;
+      h+='<div style="display:flex;gap:8px;margin-bottom:14px;">';
+      h+='<button onclick="copySelectedEntries()" '+(selectedCount===0?'disabled':'')+' style="flex:1;background:'+(selectedCount?'#5c3d2e':'#d9c9a8')+';color:#faf6ef;border:none;border-radius:10px;padding:10px;font-size:13px;font-weight:700;cursor:pointer;">Copy '+(selectedCount||'0')+' to today</button>';
+      h+='</div>';
+    } else if(copyableCount>0){
+      h+='<button onclick="copyEntireDay(\''+sel+'\')" style="background:transparent;border:1px dashed #d9c9a8;color:#5c3d2e;border-radius:10px;padding:10px;width:100%;font-size:13px;cursor:pointer;margin-bottom:14px;">📋 Copy entire day to today</button>';
+    }
+  }
+
+  // Entries
+  if(!dayEntries.length){
+    h+='<div style="text-align:center;padding:40px 20px;color:#8a7560;">';
+    h+='<div style="font-size:32px;margin-bottom:8px;">📋</div>';
+    h+='<div style="font-size:14px;">No activity '+(isToday?'today':'on this day')+'</div>';
     h+='</div>';
-    h+='<div style="background:#ffffff;border-radius:12px;border:1px solid #d9c9a8;padding:0 14px;margin-bottom:12px;">';
-    grouped[day].forEach(function(x){
-      var icon=x.type==='eat'?'🍽':x.type==='waste'?'🗑':x.type==='deleted'?'❌':x.type==='manual'?'✏️':'🥡';
-      var name, meta;
-      if(x.type==='manual'){
-        name=x.label||'Untitled';
-        var parts=[];
-        if(x.cal) parts.push(Math.round(x.cal)+' cal');
-        if(x.protein) parts.push(Math.round(x.protein)+'g pro');
-        if(x.carbs) parts.push(Math.round(x.carbs)+'g carbs');
-        if(x.fat) parts.push(Math.round(x.fat)+'g fat');
-        meta='Manual entry'+(parts.length?' · '+parts.join(' · '):'');
-      } else {
-        var it=S.items.filter(function(z){return z.id===x.itemId;})[0];
-        var u=x.unit||(it?unitOf(it):'portions');
-        var unitSuffix=u==='portions'?' portion'+(x.portions>1?'s':''):u;
-        name=x.itemName;
-        meta=x.type==='eat'?'Ate '+x.portions+unitSuffix:x.type==='waste'?'Wasted '+x.portions+unitSuffix:x.type==='deleted'?'Removed from stock':'Prepped '+x.portions+unitSuffix;
-      }
-      h+='<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid #eadec5;">';
+    return h;
+  }
+
+  h+='<div style="background:#ffffff;border-radius:12px;border:1px solid #d9c9a8;padding:0 14px;margin-bottom:12px;">';
+  dayEntries.forEach(function(x,i){
+    var icon=x.type==='eat'?'🍽':x.type==='waste'?'🗑':x.type==='deleted'?'❌':x.type==='manual'?'✏️':'🥡';
+    var name, meta;
+    if(x.type==='manual'){
+      name=x.label||'Untitled';
+      var parts=[];
+      if(x.cal) parts.push(Math.round(x.cal)+' cal');
+      if(x.protein) parts.push(Math.round(x.protein)+'g pro');
+      if(x.carbs) parts.push(Math.round(x.carbs)+'g carbs');
+      if(x.fat) parts.push(Math.round(x.fat)+'g fat');
+      meta='Manual entry'+(parts.length?' · '+parts.join(' · '):'');
+    } else {
+      var it=S.items.filter(function(z){return z.id===x.itemId;})[0];
+      var u=x.unit||(it?unitOf(it):'portions');
+      var unitSuffix=u==='portions'?' portion'+(x.portions>1?'s':''):u;
+      name=x.itemName;
+      meta=x.type==='eat'?'Ate '+x.portions+unitSuffix:x.type==='waste'?'Wasted '+x.portions+unitSuffix:x.type==='deleted'?'Removed from stock':'Prepped '+x.portions+unitSuffix;
+    }
+
+    var copyable=(x.type==='eat'||x.type==='manual') && !!x.hid;
+    var rowBorder=i<dayEntries.length-1?'border-bottom:1px solid #eadec5;':'';
+
+    if(S.historySelectMode && copyable){
+      // Select mode: row is a checkbox toggler
+      var isSelected=!!S.selectedHids[x.hid];
+      h+='<div onclick="toggleSelectedHid(\''+x.hid+'\')" style="display:flex;align-items:center;gap:12px;padding:10px 0;cursor:pointer;'+rowBorder+'">';
+      h+='<div style="width:22px;height:22px;border-radius:6px;border:2px solid '+(isSelected?'#5c3d2e':'#d9c9a8')+';background:'+(isSelected?'#5c3d2e':'transparent')+';display:flex;align-items:center;justify-content:center;flex-shrink:0;">';
+      if(isSelected) h+='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#faf6ef" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+      h+='</div>';
       h+='<div style="font-size:18px;width:26px;text-align:center;flex-shrink:0;">'+icon+'</div>';
-      h+='<div style="flex:1;"><div style="font-size:14px;font-weight:700;">'+esc(name)+'</div>';
-      h+='<div style="font-size:12px;color:#5c3d2e;">'+meta+'</div></div></div>';
-    });
-    h+='</div>';
+      h+='<div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:700;">'+esc(name)+'</div>';
+      h+='<div style="font-size:12px;color:#8a7560;">'+meta+'</div></div>';
+      h+='</div>';
+    } else {
+      h+='<div style="display:flex;align-items:center;gap:12px;padding:10px 0;'+rowBorder+'">';
+      h+='<div style="font-size:18px;width:26px;text-align:center;flex-shrink:0;">'+icon+'</div>';
+      h+='<div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:700;">'+esc(name)+'</div>';
+      h+='<div style="font-size:12px;color:#8a7560;">'+meta+'</div></div>';
+      // Quick copy button — only on past days, only on copyable entries
+      if(!isToday && copyable && !S.historySelectMode){
+        h+='<button onclick="event.stopPropagation();copyEntriesToTodaySingle(\''+x.hid+'\')" style="background:transparent;border:1px solid #d9c9a8;color:#5c3d2e;border-radius:8px;padding:5px 10px;font-size:11px;cursor:pointer;flex-shrink:0;">Copy</button>';
+      }
+      h+='</div>';
+    }
   });
+  h+='</div>';
+
   return h;
+}
+
+// Convenience for the per-row Copy button
+function copyEntriesToTodaySingle(hid){
+  var result=copyEntriesToToday([hid]);
+  alert(buildCopyResultMessage(result));
+  render();
 }
 
 // ── Settings view
