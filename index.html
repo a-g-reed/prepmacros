@@ -604,6 +604,260 @@ function toggleSelectedHid(hid){
   render();
 }
 
+// ── Copy / Plan / Calendar helpers (rebuilt after the Day view consolidation) ──
+
+// Single-row Copy from a past day — fast path, copies straight to today
+function copyEntriesToTodaySingle(hid){
+  var result=copyEntriesToToday([hid]);
+  alert(buildCopyResultMessage(result));
+  render();
+}
+
+// Pending state for copy and plan flows
+var pendingCopy=null;
+var pendingPlan=null;
+
+// Calendar opener. Mode: 'navigate' | 'copy-target' | 'plan-target'
+function openCalendar(mode){
+  var anchor=mode==='copy-target'||mode==='plan-target'?todayStr():(S.selectedDate||todayStr());
+  S.calMonth=monthStr(anchor);
+  S.modal={type:'calendar',mode:mode};
+  render();
+}
+
+function selectCalendarDate(dateStr){
+  if(!S.modal || S.modal.type!=='calendar') return;
+  var mode=S.modal.mode;
+  if(mode==='navigate'){
+    S.selectedDate=dateStr;
+    S.historySelectMode=false;
+    S.selectedHids={};
+    S.modal=null;
+    render();
+  } else if(mode==='copy-target'){
+    S.copyTargetDate=dateStr;
+    S.modal=null;
+    executePendingCopy();
+  } else if(mode==='plan-target'){
+    executePendingPlan(dateStr);
+  }
+}
+
+// Confirmation flow for entire-day copy
+function confirmCopyEntireDay(dateStr){
+  var copyableHids=S.history.filter(function(x){
+    if(!x.date || x.date.indexOf(dateStr)!==0) return false;
+    return x.type==='eat' || x.type==='manual';
+  }).map(function(x){return x.hid;}).filter(Boolean);
+  if(!copyableHids.length){ alert('Nothing to copy from this day.'); return; }
+  pendingCopy={hids:copyableHids, sourceLabel:fmtDateLabel(dateStr), kind:'entire-day'};
+  S.modal={type:'confirm-copy'};
+  render();
+}
+
+// Confirmation flow for multi-select copy
+function confirmCopySelected(){
+  var hids=Object.keys(S.selectedHids).filter(function(k){return S.selectedHids[k];});
+  if(!hids.length){ S.historySelectMode=false; render(); return; }
+  pendingCopy={hids:hids, sourceLabel:fmtDateLabel(S.selectedDate||todayStr()), kind:'selected'};
+  S.modal={type:'confirm-copy'};
+  render();
+}
+
+// Single-row copy with destination prompt (used when source row is on today)
+function confirmCopySingle(hid){
+  var src=S.history.filter(function(x){return x.hid===hid;})[0];
+  if(!src) return;
+  pendingCopy={hids:[hid], sourceLabel:fmtDateLabel((src.date||'').split('T')[0]||todayStr()), kind:'single'};
+  S.modal={type:'confirm-copy'};
+  render();
+}
+
+function executePendingCopy(){
+  if(!pendingCopy) return;
+  var dest=S.copyTargetDate||todayStr();
+  var result=copyEntriesToDate(pendingCopy.hids, dest);
+  pendingCopy=null;
+  S.copyTargetDate=null;
+  S.historySelectMode=false;
+  S.selectedHids={};
+  alert(buildCopyResultMessage(result, dest));
+  render();
+}
+
+// Plan a meal/manual entry for a future date
+function planMealForLater(){
+  if(!S.modal || S.modal.type!=='log') return;
+  var it=S.modal.item; if(!it) return;
+  var n=parseFloat(S.logPortions); if(!n||n<=0) return;
+  pendingPlan={kind:'eat', itemId:it.id, itemName:it.name, portions:n, unit:unitOf(it)};
+  S.modal=null;
+  S.calMonth=monthStr(todayStr());
+  S.modal={type:'calendar',mode:'plan-target'};
+  render();
+}
+
+function planManualEntryForLater(){
+  if(!S.modal || S.modal.type!=='manual-entry') return;
+  var f=S.manualForm||{};
+  var cal=parseFloat(f.cal)||0;
+  var protein=parseFloat(f.protein)||0;
+  var carbs=parseFloat(f.carbs)||0;
+  var fat=parseFloat(f.fat)||0;
+  if(cal<=0 && protein<=0 && carbs<=0 && fat<=0){
+    alert('Please enter at least one macro value.');
+    return;
+  }
+  var label=(f.label||'').trim()||'Untitled';
+  pendingPlan={kind:'manual', label:label, cal:cal, protein:protein, carbs:carbs, fat:fat};
+  S.modal=null;
+  S.calMonth=monthStr(todayStr());
+  S.modal={type:'calendar',mode:'plan-target'};
+  render();
+}
+
+function executePendingPlan(dateStr){
+  if(!pendingPlan) return;
+  var nowIso=dateStr===todayStr() ? new Date().toISOString() : (dateStr+'T12:00:00.000Z');
+  var entry;
+  if(pendingPlan.kind==='manual'){
+    entry={
+      hid:newHid(),
+      type:'planned',
+      plannedKind:'manual',
+      label:pendingPlan.label,
+      cal:pendingPlan.cal,
+      protein:pendingPlan.protein,
+      carbs:pendingPlan.carbs,
+      fat:pendingPlan.fat,
+      date:nowIso
+    };
+  } else {
+    entry={
+      hid:newHid(),
+      type:'planned',
+      plannedKind:'eat',
+      itemId:pendingPlan.itemId,
+      itemName:pendingPlan.itemName,
+      portions:pendingPlan.portions,
+      unit:pendingPlan.unit,
+      date:nowIso
+    };
+  }
+  S.history.unshift(entry);
+  var label=fmtDateLabel(dateStr).toLowerCase();
+  pendingPlan=null;
+  S.modal=null;
+  S.logPortions=1;
+  S.manualForm=null;
+  save();
+  render();
+  setTimeout(function(){
+    alert('Planned for '+label+'. View it on the Day tab on the day itself to confirm.');
+  },50);
+}
+
+// Confirm a single planned entry (deduct stock for eat-kind, become manual for manual-kind)
+function confirmPlannedEntry(hid){
+  var plan=S.history.filter(function(x){return x.hid===hid;})[0];
+  if(!plan || plan.type!=='planned') return {confirmed:0};
+  var nowIso=new Date().toISOString();
+  if(plan.plannedKind==='manual'){
+    S.history=S.history.map(function(x){
+      if(x.hid!==hid) return x;
+      return {
+        hid:x.hid,
+        type:'manual',
+        label:plan.label,
+        cal:plan.cal,
+        protein:plan.protein,
+        carbs:plan.carbs,
+        fat:plan.fat,
+        date:nowIso
+      };
+    });
+    return {confirmed:1};
+  }
+  var it=S.items.filter(function(x){return x.id===plan.itemId;})[0];
+  if(!it){
+    S.history=S.history.filter(function(x){return x.hid!==hid;});
+    return {confirmed:0, missing:plan.itemName};
+  }
+  if(it.portions<=0){
+    return {confirmed:0, noStock:plan.itemName};
+  }
+  var requested=plan.portions;
+  var actual=Math.min(requested, it.portions);
+  S.items=S.items.map(function(x){
+    if(x.id!==it.id) return x;
+    return {id:x.id,name:x.name,category:x.category,unit:x.unit,portions:Math.max(0,x.portions-actual),totalPortions:x.totalPortions,expiryDays:x.expiryDays,macros:x.macros,notes:x.notes,prepDate:x.prepDate,lastEaten:nowIso,archived:x.archived};
+  });
+  S.history=S.history.map(function(x){
+    if(x.hid!==hid) return x;
+    return {
+      hid:x.hid,
+      type:'eat',
+      itemId:it.id,
+      itemName:it.name,
+      portions:actual,
+      unit:plan.unit||unitOf(it),
+      date:nowIso
+    };
+  });
+  delete S.dismissedAlerts['fgt-'+it.id];
+  var partial=null;
+  if(actual<requested){ partial={name:plan.itemName, requested:requested, actual:actual, unit:plan.unit||unitOf(it)}; }
+  return {confirmed:1, partial:partial};
+}
+
+function confirmPlannedEntryUI(hid){
+  var r=confirmPlannedEntry(hid);
+  save();
+  if(r.missing){ alert('Skipped (item removed): '+r.missing); }
+  else if(r.noStock){ alert('Cannot confirm — no stock left for: '+r.noStock); }
+  else if(r.partial){
+    var p=r.partial;
+    var sfx=p.unit==='portions'?(' portion'+(p.actual!==1?'s':'')):p.unit;
+    var rsfx=p.unit==='portions'?(' portion'+(p.requested!==1?'s':'')):p.unit;
+    alert('Partial: '+p.name+' — only '+p.actual+sfx+' available (wanted '+p.requested+rsfx+')');
+  }
+  render();
+}
+
+function cancelPlannedEntry(hid){
+  S.history=S.history.filter(function(x){return x.hid!==hid;});
+  save();
+  render();
+}
+
+function confirmAllPlannedToday(){
+  var t=todayStr();
+  var planned=S.history.filter(function(x){return x.type==='planned' && x.date && x.date.indexOf(t)===0;});
+  if(!planned.length) return;
+  var result={confirmed:0, partial:[], noStock:[], missing:[]};
+  planned.forEach(function(p){
+    var r=confirmPlannedEntry(p.hid);
+    if(r.confirmed) result.confirmed++;
+    if(r.partial) result.partial.push(r.partial);
+    if(r.noStock) result.noStock.push(r.noStock);
+    if(r.missing) result.missing.push(r.missing);
+  });
+  save();
+  var lines=[];
+  if(result.confirmed>0) lines.push(result.confirmed+' plan'+(result.confirmed===1?'':'s')+' confirmed.');
+  if(result.partial.length){
+    result.partial.forEach(function(p){
+      var sfx=p.unit==='portions'?(' portion'+(p.actual!==1?'s':'')):p.unit;
+      var rsfx=p.unit==='portions'?(' portion'+(p.requested!==1?'s':'')):p.unit;
+      lines.push('Partial: '+p.name+' — only '+p.actual+sfx+' available (wanted '+p.requested+rsfx+')');
+    });
+  }
+  if(result.noStock.length) lines.push('No stock: '+result.noStock.join(', '));
+  if(result.missing.length) lines.push('Item removed: '+result.missing.join(', '));
+  if(lines.length) alert(lines.join('\n'));
+  render();
+}
+
 function openArchiveConfirm(id){
   var it=S.items.filter(function(x){return x.id===id;})[0]; if(!it)return;
   S.modal={type:'confirm-archive',item:it};
