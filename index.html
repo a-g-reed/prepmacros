@@ -45,11 +45,11 @@ function getCats(){
 }
 // Legacy var kept for compatibility with inline references that still read CATS
 Object.defineProperty(window,'CATS',{get:function(){return getCats();}});
-var DEFAULTS = { lowStockThreshold:3, expiryDays:5, forgottenDays:14, targetCal:0, targetProtein:0, targetCarbs:0, targetFat:0, categories:['Protein','Carbs','Veg','Snack','Dessert','Creami Base','Other'], seenAlerts:{} };
+var DEFAULTS = { lowStockThreshold:3, expiryDays:5, forgottenDays:14, targetCal:0, targetProtein:0, targetCarbs:0, targetFat:0, categories:['Protein','Carbs','Veg','Snack','Dessert','Creami Base','Other'], seenAlerts:{}, stockSort:'manual' };
 
 // ── State ────────────────────────────────────────────────────────────────────
 var S = {
-  items:[], history:[], settings:{lowStockThreshold:3,expiryDays:5,forgottenDays:14,targetCal:0,targetProtein:0,targetCarbs:0,targetFat:0,categories:['Protein','Carbs','Veg','Snack','Dessert','Creami Base','Other'],seenAlerts:{}},
+  items:[], history:[], settings:{lowStockThreshold:3,expiryDays:5,forgottenDays:14,targetCal:0,targetProtein:0,targetCarbs:0,targetFat:0,categories:['Protein','Carbs','Veg','Snack','Dessert','Creami Base','Other'],seenAlerts:{},stockSort:'manual'},
   dismissedAlerts:{}, view:'stock', filterCat:'All', expandedId:null,
   modal:null, logPortions:1, restockPortions:1, wastePortions:1, editForm:null,
   syncStatus:'syncing', syncMsg:'Loading\u2026',
@@ -681,8 +681,10 @@ function executePendingCopy(){
   S.copyTargetDate=null;
   S.historySelectMode=false;
   S.selectedHids={};
-  alert(buildCopyResultMessage(result, dest));
+  S.modal=null;
   render();
+  // Show the result alert AFTER the modal has dismissed so it doesn't linger behind
+  setTimeout(function(){ alert(buildCopyResultMessage(result, dest)); }, 50);
 }
 
 // Plan a meal/manual entry for a future date
@@ -1164,12 +1166,50 @@ function renderStock(){
     else if(S.stockFilter==='out') items=items.filter(function(it){return it.portions===0;});
   }
 
-  // Sort by user-defined order (falls back to original sequence for items with no order field yet)
-  items.sort(function(a,b){
+  // Sort according to the user's selected stockSort. Reorder mode always overrides
+  // back to manual order so the up/down arrows make sense.
+  var sortKey=S.reorderMode?'manual':(S.settings.stockSort||'manual');
+  var manualOrder=function(a,b){
     var ao=typeof a.order==='number'?a.order:9999;
     var bo=typeof b.order==='number'?b.order:9999;
     return ao-bo;
-  });
+  };
+  if(sortKey==='alpha'){
+    items.sort(function(a,b){return (a.name||'').toLowerCase().localeCompare((b.name||'').toLowerCase());});
+  } else if(sortKey==='portions-desc'){
+    items.sort(function(a,b){
+      if(b.portions!==a.portions) return b.portions-a.portions;
+      return manualOrder(a,b);
+    });
+  } else if(sortKey==='portions-asc'){
+    items.sort(function(a,b){
+      if(a.portions!==b.portions) return a.portions-b.portions;
+      return manualOrder(a,b);
+    });
+  } else if(sortKey==='expiry'){
+    // Most urgent first: items with expiry days set, sorted by (expiryDays - age) ascending.
+    // Items without expiry data fall to the bottom.
+    items.sort(function(a,b){
+      var defaultExp=S.settings.expiryDays;
+      var aExp=a.expiryDays!=null?a.expiryDays:defaultExp;
+      var bExp=b.expiryDays!=null?b.expiryDays:defaultExp;
+      var aAge=daysSince(a.prepDate); if(aAge===null) aAge=0;
+      var bAge=daysSince(b.prepDate); if(bAge===null) bAge=0;
+      var aLeft=(aExp!=null)?(aExp-aAge):9999;
+      var bLeft=(bExp!=null)?(bExp-bAge):9999;
+      if(aLeft!==bLeft) return aLeft-bLeft;
+      return manualOrder(a,b);
+    });
+  } else if(sortKey==='newest'){
+    items.sort(function(a,b){
+      var ad=a.prepDate||'';
+      var bd=b.prepDate||'';
+      if(bd!==ad) return bd.localeCompare(ad);
+      return manualOrder(a,b);
+    });
+  } else {
+    items.sort(manualOrder);
+  }
 
   var h='';
 
@@ -1194,6 +1234,25 @@ function renderStock(){
   // Quick action: + Add manual entry (visible in normal stock view only)
   if(!S.showArchived && S.stockFilter==='all' && !S.reorderMode){
     h+='<button onclick="openManualEntry()" style="background:transparent;border:1px dashed #d9c9a8;color:#5c3d2e;border-radius:10px;padding:10px;width:100%;font-size:13px;cursor:pointer;margin-bottom:12px;">+ Add manual entry</button>';
+  }
+
+  // Sort pills (only shown in normal stock view)
+  if(!S.showArchived && S.stockFilter==='all' && !S.reorderMode){
+    var sorts=[
+      ['manual','Manual'],
+      ['alpha','A→Z'],
+      ['portions-desc','Most stock'],
+      ['portions-asc','Least stock'],
+      ['expiry','Expiring soon'],
+      ['newest','Newest prep']
+    ];
+    h+='<div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:8px;">';
+    h+='<span style="font-size:10px;color:#8a7560;text-transform:uppercase;letter-spacing:0.6px;align-self:center;flex-shrink:0;padding-right:4px;">Sort</span>';
+    sorts.forEach(function(s){
+      var active=(S.settings.stockSort||'manual')===s[0];
+      h+='<button onclick="S.settings.stockSort=\''+s[0]+'\';save();render();" style="padding:5px 12px;border-radius:20px;white-space:nowrap;font-size:12px;border:'+(active?'none':'1px solid #eadec5')+';background:'+(active?'#5c3d2e':'transparent')+';color:'+(active?'#faf6ef':'#5c3d2e')+';flex-shrink:0;">'+s[1]+'</button>';
+    });
+    h+='</div>';
   }
 
   // Category filter pills (only shown when not viewing archived and no stock filter)
